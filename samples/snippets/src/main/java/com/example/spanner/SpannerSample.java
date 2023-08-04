@@ -69,6 +69,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.threeten.bp.LocalDate;
 import org.threeten.bp.LocalDateTime;
@@ -414,6 +416,82 @@ public class SpannerSample {
   }
   // [END spanner_insert_data]
 
+    // Writes rows [startId, endId)
+    static void hubbleWriteRows(DatabaseClient dbClient,
+				int startId,
+				int endId) {
+	// This is sort of weird, guids aren't really this long. Maybe make this into messages?
+	char[] chars = new char[5000]; // 5KB
+	Arrays.fill(chars, 'a');
+	String ballast = new String(chars);
+	
+	List<Mutation> mutations = new ArrayList<>();
+	for (int sid = startId; sid < endId; ++sid) {
+	    mutations.add(Mutation.newInsertBuilder("Mailbox")
+			  .set("sid").to(sid)
+			  .set("guid").to(ballast)
+			  .build());
+	}
+	dbClient.write(mutations);
+	System.out.printf("Ids [%d, %d)\n", startId, endId);	
+    }
+
+    // Breaks if numRows is not evenly divisible by (rowsPerTransaction * numThreads)
+    static void hubbleDistributedWrites(DatabaseClient dbClient,
+					int numRows,
+					int rowsPerTransaction,
+					int numThreads) {
+	int numTransactions = numRows / rowsPerTransaction;
+	int numTransactionsPerThread = numTransactions / numThreads;
+	int numRowsPerThread = numRows / numThreads;
+
+	ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+	
+	for (int i = 0; i < numTransactionsPerThread; ++i) {
+	    for (int j = 0; j < numThreads; ++j) {
+		int startId = (j * numRowsPerThread) + (i * rowsPerTransaction);
+		int endId = startId + rowsPerTransaction;
+		executorService.submit(new Runnable() {
+			@Override
+			public void run() {
+			    hubbleWriteRows(dbClient, startId, endId);
+			}
+		    });
+	    }
+	}
+	executorService.shutdown();
+	while (!executorService.isTerminated()) {}
+    }
+
+    // This is the same as above, except the inner and outer loops are switched.
+    static void hubbleIncreasingWrites(DatabaseClient dbClient,
+					int numRows,
+					int offset,
+					int rowsPerTransaction,
+					int numThreads) {
+	int numTransactions = numRows / rowsPerTransaction;
+	int numTransactionsPerThread = numTransactions / numThreads;
+	int numRowsPerThread = numRows / numThreads;
+
+	ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+	
+	for (int i = 0; i < numThreads; ++i) {
+	    for (int j = 0; j < numTransactionsPerThread; ++j) {
+		int startId = (i * numRowsPerThread) + (j * rowsPerTransaction);
+		int endId = startId + rowsPerTransaction;
+		executorService.submit(new Runnable() {
+			@Override
+			public void run() {
+			    hubbleWriteRows(dbClient, startId + offset, endId + offset);
+			}
+		    });
+	    }
+	}
+	executorService.shutdown();
+	while (!executorService.isTerminated()) {}
+    }
+
+				       
   // [START spanner_delete_data]
   static void deleteExampleData(DatabaseClient dbClient) {
     List<Mutation> mutations = new ArrayList<>();
@@ -1944,6 +2022,12 @@ public class SpannerSample {
         break;
       case "hubbleCreateDatabase":
 	  hubbleCreateDatabase(dbAdminClient, database);
+	  break;
+      case "hubbleDistributedWrites":
+	  hubbleDistributedWrites(dbClient, 50000000, 1000, 40);
+	  break;
+      case "hubbleIncreasingWrites":
+	  hubbleIncreasingWrites(dbClient, 25000000, 50000000, 1000, 40);
 	  break;
       case "write":
         writeExampleData(dbClient);
