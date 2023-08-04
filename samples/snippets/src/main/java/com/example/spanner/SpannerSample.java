@@ -307,6 +307,31 @@ public class SpannerSample {
   }
   // [END spanner_create_database]
 
+  static void hubbleCreateDatabase(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+      OperationFuture<Database, CreateDatabaseMetadata> op =
+	  dbAdminClient.createDatabase(
+	      id.getInstanceId().getInstance(),
+	      id.getDatabase(),
+	      Arrays.asList(
+	          "CREATE TABLE Mailbox("
+		      + " sid INT64 NOT NULL,"
+		      + " guid STRING(MAX),"
+		      + " state BYTES(MAX),"
+		      + ") PRIMARY KEY (sid)"));
+    try {
+      // Initiate the request which returns an OperationFuture.
+      Database db = op.get();
+      System.out.println("Created database [" + db.getId() + "]");
+    } catch (ExecutionException e) {
+      // If the operation failed during execution, expose the cause.
+      throw (SpannerException) e.getCause();
+    } catch (InterruptedException e) {
+      // Throw when a thread is waiting, sleeping, or otherwise occupied,
+      // and the thread is interrupted, either before or during the activity.
+      throw SpannerExceptionFactory.propagateInterrupt(e);
+    }
+  }
+
   // [START spanner_create_table_with_timestamp_column]
   static void createTableWithTimestamp(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     OperationFuture<Void, UpdateDatabaseDdlMetadata> op =
@@ -1917,6 +1942,9 @@ public class SpannerSample {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
         break;
+      case "hubbleCreateDatabase":
+	  hubbleCreateDatabase(dbAdminClient, database);
+	  break;
       case "write":
         writeExampleData(dbClient);
         break;
