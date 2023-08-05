@@ -309,30 +309,6 @@ public class SpannerSample {
   }
   // [END spanner_create_database]
 
-  static void hubbleCreateDatabase(DatabaseAdminClient dbAdminClient, DatabaseId id) {
-      OperationFuture<Database, CreateDatabaseMetadata> op =
-	  dbAdminClient.createDatabase(
-	      id.getInstanceId().getInstance(),
-	      id.getDatabase(),
-	      Arrays.asList(
-	          "CREATE TABLE Mailbox("
-		      + " sid INT64 NOT NULL,"
-		      + " guid STRING(MAX),"
-		      + " state BYTES(MAX),"
-		      + ") PRIMARY KEY (sid)"));
-    try {
-      // Initiate the request which returns an OperationFuture.
-      Database db = op.get();
-      System.out.println("Created database [" + db.getId() + "]");
-    } catch (ExecutionException e) {
-      // If the operation failed during execution, expose the cause.
-      throw (SpannerException) e.getCause();
-    } catch (InterruptedException e) {
-      // Throw when a thread is waiting, sleeping, or otherwise occupied,
-      // and the thread is interrupted, either before or during the activity.
-      throw SpannerExceptionFactory.propagateInterrupt(e);
-    }
-  }
 
   // [START spanner_create_table_with_timestamp_column]
   static void createTableWithTimestamp(DatabaseAdminClient dbAdminClient, DatabaseId id) {
@@ -437,7 +413,7 @@ public class SpannerSample {
     }
 
     // Breaks if numRows is not evenly divisible by (rowsPerTransaction * numThreads)
-    static void hubbleDistributedWrites(DatabaseClient dbClient,
+    static void hubbleDistripbutedWrites(DatabaseClient dbClient,
 					int numRows,
 					int rowsPerTransaction,
 					int numThreads) {
@@ -2009,6 +1985,77 @@ public class SpannerSample {
   }
   // [END spanner_delete_backup]
 
+    static void hubbleCreateDatabase(DatabaseAdminClient dbAdminClient,
+				     DatabaseId id,
+				     List<String> schema) {
+	OperationFuture<Database, CreateDatabaseMetadata> op =
+	    dbAdminClient.createDatabase(
+	        id.getInstanceId().getInstance(),
+		id.getDatabase(),
+		schema);
+	try {
+	    // Initiate the request which returns an OperationFuture.
+	    Database db = op.get();
+	    System.out.println("Created database [" + db.getId() + "]");
+	} catch (ExecutionException e) {
+	    // If the operation failed during execution, expose the cause.
+	    throw (SpannerException) e.getCause();
+	} catch (InterruptedException e) {
+	    // Throw when a thread is waiting, sleeping, or otherwise occupied,
+	    // and the thread is interrupted, either before or during the activity.
+	    throw SpannerExceptionFactory.propagateInterrupt(e);
+	}
+    }
+
+    static void hubbleCreateMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+	hubbleCreateDatabase(
+	    dbAdminClient,
+	    id,
+	    Arrays.asList(
+	        "CREATE TABLE Message("
+		    + " msg_id STRING(MAX) NOT NULL,"
+		    + " body STRING(MAX),"
+		    + ") PRIMARY KEY (msg_id)"));
+    }
+    
+    static void hubbleCreateInterleaved(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+	hubbleCreateDatabase(
+	    dbAdminClient,
+	    id,
+	    Arrays.asList(
+	        "CREATE TABLE Mailbox("
+		    + " sid INT64 NOT NULL,"
+		    + " state STRING(MAX),"
+		    + ") PRIMARY KEY (sid)",
+  	        "CREATE TABLE Message("
+	            + " sid INT64 NOT NULL,"
+	            + " msg_id STRING(MAX) NOT NULL,"
+		    + " body STRING(MAX),"
+		    + ") PRIMARY KEY (sid, msg_id),"
+		    + " INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
+    }
+
+    static void hubbleWriteMailboxes(DatabaseClient dbClient, int numMailboxes) {
+	List<Mutation> mutations = new ArrayList<>();
+	for (int sid = 0; sid < numMailboxes; ++sid) {
+	    mutations.add(Mutation.newInsertBuilder("Mailbox")
+			  .set("sid").to(sid)
+			  .build());
+	}
+	dbClient.write(mutations);
+    }
+
+    static void hubbleNaiveWriteMessages(DatabaseClient dbClient, int numMessages) {
+	for (int i = 0; i < numMessages; ++i) {
+	    List<Mutation> mutations = new ArrayList<>();
+	    mutations.add(Mutation.newInsertBuilder("Message")
+			  .set("msg_id").to(Instant.now().toString())
+			  .set("body").to("ballast")
+			  .build());
+	    dbClient.write(mutations);
+	}
+    }
+
   static void run(
       DatabaseClient dbClient,
       DatabaseAdminClient dbAdminClient,
@@ -2020,15 +2067,16 @@ public class SpannerSample {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
         break;
-      case "hubbleCreateDatabase":
-	  hubbleCreateDatabase(dbAdminClient, database);
-	  break;
-      case "hubbleDistributedWrites":
-	  hubbleDistributedWrites(dbClient, 50000000, 1000, 40);
-	  break;
-      case "hubbleIncreasingWrites":
-	  hubbleIncreasingWrites(dbClient, 25000000, 50000000, 1000, 40);
-	  break;
+      case "hubbleCreateMessages":
+	hubbleCreateMessages(dbAdminClient, database);
+	break;
+      case "hubbleNaiveWriteMessages":
+	hubbleNaiveWriteMessages(dbClient, 10);
+	break;
+      case "hubbleCreateInterleaved":
+	hubbleCreateInterleaved(dbAdminClient, database);
+	hubbleWriteMailboxes(dbClient, 40);
+	break;
       case "write":
         writeExampleData(dbClient);
         break;
