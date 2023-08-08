@@ -2187,10 +2187,11 @@ public class SpannerSample {
 	}
     }
 
-    static void hubbleStrongReads(DatabaseClient dbClient,
-				  List<List<String>> keys,
-				  int mutationsPerTransaction,
-				  int numMinutes) {
+    static void hubbleReads(DatabaseClient dbClient,
+			     List<List<String>> keys,
+			     int mutationsPerTransaction,
+			     int numMinutes,
+			     boolean isStrong) {
 	Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
 	Random random = new Random();
 	while (Instant.now().isBefore(doneTime)) {
@@ -2200,22 +2201,30 @@ public class SpannerSample {
 		String uuid = keys.get(sid).get(random.nextInt(keys.get(sid).size()));
 		keySetBuilder.addKey(Key.of(sid, uuid));
 	    }
-	    ResultSet throwaway = dbClient
-		.singleUse()
-		.read("Message",
-		      keySetBuilder.build(),
-		      Arrays.asList("body"));
-	    while (throwaway.next()) {
-		System.out.printf("%s\n", throwaway.getString(0));
+	    if (isStrong) {
+		ResultSet throwaway = dbClient
+		    .singleUse()
+		    .read("Message",
+			  keySetBuilder.build(),
+			  Arrays.asList("body"));
+		while (throwaway.next()) {}
+	    } else {
+		ResultSet throwaway = dbClient
+		    .singleUse(TimestampBound.ofMaxStaleness(15, TimeUnit.SECONDS))
+		    .read("Message",
+			  keySetBuilder.build(),
+			  Arrays.asList("body"));
+		while (throwaway.next()) {}
 	    }
 	}
     }
 
-    static void hubbleUpdatesAndStrongReads(DatabaseClient dbClient,
-					    int numMailboxes,
-					    int mutationsPerTransaction,
-					    int numRows,
-					    int numMinutes) {
+    static void hubbleUpdatesAndReads(DatabaseClient dbClient,
+				      int numMailboxes,
+				      int mutationsPerTransaction,
+				      int numRows,
+				      int numMinutes,
+				      boolean isStrong) {
 	List<List<String>> keys = new ArrayList<>(numMailboxes);
 	for (int i = 0; i < numMailboxes; ++i) {
 	    keys.add(new ArrayList<>(numRows / numMailboxes));
@@ -2254,21 +2263,17 @@ public class SpannerSample {
 		    }
 		});
 
-	    /*
 	    readExecutor.submit(new Runnable() {
 		    @Override
 		    public void run() {
-			hubbleStrongReads(dbClient,
-					  keys,
-					  mutationsPerTransaction,
-					  numMinutes);
+			hubbleReads(dbClient,
+				    keys,
+				    mutationsPerTransaction,
+				    numMinutes,
+				    isStrong);
 		    }
 		});
-	    */
-	    
 	}
-
-	hubbleStrongReads(dbClient, keys, mutationsPerTransaction, numMinutes);
 
 	writeExecutor.shutdown();
 	readExecutor.shutdown();
@@ -2312,7 +2317,10 @@ public class SpannerSample {
 	hubbleWriteMessagesInterleavedParallel(dbClient, 40, 50, 5);
 	break;
       case "hubbleUpdatesAndStrongReads":
-	hubbleUpdatesAndStrongReads(dbClient, 40, 5, 1000, 5);
+	hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, true);
+	break;
+      case "hubbleUpdatesAndWeakReads":
+	hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, false);
 	break;
       case "write":
         writeExampleData(dbClient);
