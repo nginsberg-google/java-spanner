@@ -2042,6 +2042,86 @@ public class SpannerSample {
 		    + " INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
     }
 
+    static void hubbleCreateWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+	hubbleCreateDatabase(
+	   dbAdminClient,
+	   id,
+	   Arrays.asList(
+	       "CREATE TABLE WorkList("
+	           + " id STRING(MAX) NOT NULL,"
+	           + " is_done BOOL,"
+	           + ") PRIMARY KEY (id)"));
+    }
+
+    static void hubbleWriteWorkItems(DatabaseClient dbClient,
+				     int numWorkItems,
+				     int mutationsPerTransaction) {
+	int numTransactions = numWorkItems / mutationsPerTransaction;
+	for (int i = 0; i < numTransactions; ++i) {
+	    List<Mutation> mutations = new ArrayList<>();
+	    for (int j = 0; j < mutationsPerTransaction; ++j) {
+		mutations.add(Mutation.newInsertBuilder("WorkList")
+			      .set("id").to(UUID.randomUUID().toString())
+			      .set("is_done").to(false)
+			      .build());
+	    }
+	    dbClient.write(mutations);
+	}
+    }
+
+    static boolean hubbleDoWorkSingleTransaction(DatabaseClient dbClient,
+						 boolean doneValue) {
+	String stmt = String.format("SELECT * FROM WorkList WHERE is_done is %b LIMIT 100", !doneValue);
+	boolean didWork =
+	    dbClient.readWriteTransaction()
+	        .run(transaction -> {
+			Random random = new Random();
+			ResultSet resultSet = transaction.executeQuery(Statement.of(stmt));
+			List<List<Object>> rows = resultSet.getRows();
+			resultSet.close();
+			if (rows.size() == 0) return false;
+			int randIdx = random.nextInt(resultSet.size());
+			String id = rows.get(randIdx).get(0);
+			System.out.printf("Doing work: %s\n", id);
+			transaction.buffer(
+			   Mutation.newUpdateBuilder("WorkList")
+			   .set("id").to(id)
+			   .set("is_done").to(doneValue)
+			   .build());
+			return true;
+		    });
+	return didWork;
+    }
+
+    static void hubbleDoWorkSingleTransactionSerial(DatabaseClient dbClient,
+						    boolean doneValue) {
+	boolean workRemaining = true;
+	int workDone = 0;
+	while (workRemaining) {
+	    workRemaining = hubbleDoWorkSingleTransaction(dbClient, doneValue);
+	    if (workDone++ % 1000 == 0) {
+		System.out.printf(">>>>>>>>>>>>>>>> Done %d work <<<<<<<<<<<<<\n", workDone);
+	    }
+	}
+    }
+
+    static void hubbleDoWorkSingleTransactionParallel(DatabaseClient dbClient,
+						      boolean doneValue) {
+	int numProcessors = Runtime.getRuntime().availableProcessors();
+	ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+	
+	for (int i = 0; i < numProcessors; ++i) {
+	    executorService.submit(new Runnable() {
+		    @Override
+		    public void run() {
+			hubbleDoWorkSingleTransactionSerial(dbClient, doneValue);
+		    }
+		});
+	}
+	executorService.shutdown();
+	while (!executorService.isTerminated()) {}
+    }
+
     static void hubbleWriteMailboxes(DatabaseClient dbClient, int numMailboxes) {
 	List<Mutation> mutations = new ArrayList<>();
 	for (int sid = 0; sid < numMailboxes; ++sid) {
@@ -2321,6 +2401,18 @@ public class SpannerSample {
 	break;
       case "hubbleUpdatesAndWeakReads":
 	hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, false);
+	break;
+      case "hubbleCreateWorkItems":
+	hubbleCreateWorkItems(dbAdminClient, database);
+	break;
+      case "hubbleWriteWorkItems":
+	hubbleWriteWorkItems(dbClient, 10000, 50);
+	break;
+      case "hubbleDoWorkSingleTransactionSerial":
+	hubbleDoWorkSingleTransactionSerial(dbClient, true);
+	break;
+      case "hubbleDoWorkSingleTransactionParallel":
+	hubbleDoWorkSingleTransactionParallel(dbClient, false);
 	break;
       case "write":
         writeExampleData(dbClient);
