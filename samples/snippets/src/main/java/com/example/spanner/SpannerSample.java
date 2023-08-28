@@ -2018,52 +2018,52 @@ public class SpannerSample {
       String command,
       DatabaseId database,
       BackupId backup) {
-      CodeLab1 codeLab1=new CodeLab1();
+      HubbleTransactionsCodeLab hubbleTransactionsCodeLab=new HubbleTransactionsCodeLab();
     switch (command) {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
         break;
-      case "hubbleCreateMessages":
-          codeLab1.hubbleCreateMessages(dbAdminClient, database);
+      case "transactionLabCreateMessages":
+          hubbleTransactionsCodeLab.createMessages(dbAdminClient, database);
 	break;
-      case "hubbleWriteMessages1":
-          codeLab1.hubbleWriteMessages(dbClient, 1, 5);
+      case "transactionLabWriteMessages1":
+          hubbleTransactionsCodeLab.writeMessages(dbClient, 1, 5);
 	break;
-      case "hubbleWriteMessages50":
-          codeLab1.hubbleWriteMessages(dbClient, 50, 5);
+      case "transactionLabWriteMessages50":
+          hubbleTransactionsCodeLab.writeMessages(dbClient, 50, 5);
 	break;
-      case "hubbleWriteMessagesParallel":
-          codeLab1.hubbleWriteMessagesParallel(dbClient, 50, 5);
+      case "transactionLabWriteMessagesParallel":
+          hubbleTransactionsCodeLab.writeMessagesParallel(dbClient, 50, 5);
 	break;
-      case "hubbleWriteMessagesParallelUUID":
-          codeLab1.hubbleWriteMessagesParallelUUID(dbClient, 50, 5);
+      case "transactionLabWriteMessagesParallelUUID":
+          hubbleTransactionsCodeLab.writeMessagesParallelUUID(dbClient, 50, 5);
 	break;
-      case "hubbleCreateInterleaved":
-          codeLab1.hubbleCreateInterleaved(dbAdminClient, database);
+      case "transactionLabCreateInterleaved":
+          hubbleTransactionsCodeLab.createInterleaved(dbAdminClient, database);
 	break;
-      case "hubbleWriteMailboxes":
-          codeLab1.hubbleWriteMailboxes(dbClient, 40);
+      case "transactionLabWriteMailboxes":
+          hubbleTransactionsCodeLab.writeMailboxes(dbClient, 40);
 	break;
-      case "hubbleWriteMessagesInterleavedParallel":
-          codeLab1.hubbleWriteMessagesInterleavedParallel(dbClient, 40, 50, 5);
+      case "transactionLabWriteMessagesInterleavedParallel":
+          hubbleTransactionsCodeLab.writeMessagesInterleavedParallel(dbClient, 40, 50, 5);
 	break;
-      case "hubbleUpdatesAndStrongReads":
-          codeLab1.hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, true);
+      case "transactionLabUpdatesAndStrongReads":
+          hubbleTransactionsCodeLab.updatesAndReads(dbClient, 40, 5, 1000, 5, true);
 	break;
-      case "hubbleUpdatesAndWeakReads":
-          codeLab1.hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, false);
+      case "transactionLabUpdatesAndWeakReads":
+          hubbleTransactionsCodeLab.updatesAndReads(dbClient, 40, 5, 1000, 5, false);
 	break;
-      case "hubbleCreateWorkItems":
-          codeLab1.hubbleCreateWorkItems(dbAdminClient, database);
+      case "transactionLabCreateWorkItems":
+          hubbleTransactionsCodeLab.createWorkItems(dbAdminClient, database);
 	break;
-      case "hubbleWriteWorkItems":
-          codeLab1.hubbleWriteWorkItems(dbClient, 10000, 50);
+      case "transactionLabWriteWorkItems":
+          hubbleTransactionsCodeLab.writeWorkItems(dbClient, 10000, 50);
 	break;
-      case "hubbleDoWorkSingleTransactionSerial":
-          codeLab1.hubbleDoWorkSingleTransactionSerial(dbClient, true);
+      case "transactionLabDoWorkSingleTransactionSerial":
+          hubbleTransactionsCodeLab.doWorkSingleTransactionSerial(dbClient, true);
 	break;
-      case "hubbleDoWorkSingleTransactionParallel":
-          codeLab1.hubbleDoWorkSingleTransactionParallel(dbClient, false);
+      case "transactionLabDoWorkSingleTransactionParallel":
+          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
 	break;
       case "write":
         writeExampleData(dbClient);
