@@ -65,12 +65,9 @@ import com.google.spanner.admin.database.v1.UpdateDatabaseDdlMetadata;
 import com.google.spanner.v1.ExecuteSqlRequest.QueryOptions;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -2014,353 +2011,6 @@ public class SpannerSample {
 	}
     }
 
-    static void hubbleCreateMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
-	hubbleCreateDatabase(
-	    dbAdminClient,
-	    id,
-	    Arrays.asList(
-	        "CREATE TABLE Message("
-		    + " msg_id STRING(MAX) NOT NULL,"
-		    + " body STRING(MAX),"
-		    + ") PRIMARY KEY (msg_id)"));
-    }
-    
-    static void hubbleCreateInterleaved(DatabaseAdminClient dbAdminClient, DatabaseId id) {
-	hubbleCreateDatabase(
-	    dbAdminClient,
-	    id,
-	    Arrays.asList(
-	        "CREATE TABLE Mailbox("
-		    + " sid INT64 NOT NULL,"
-		    + " state STRING(MAX),"
-		    + ") PRIMARY KEY (sid)",
-  	        "CREATE TABLE Message("
-	            + " sid INT64 NOT NULL,"
-	            + " msg_id STRING(MAX) NOT NULL,"
-		    + " body STRING(MAX),"
-		    + ") PRIMARY KEY (sid, msg_id),"
-		    + " INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
-    }
-
-    static void hubbleCreateWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
-	hubbleCreateDatabase(
-	   dbAdminClient,
-	   id,
-	   Arrays.asList(
-	       "CREATE TABLE WorkList("
-	           + " id STRING(MAX) NOT NULL,"
-	           + " is_done BOOL,"
-	           + ") PRIMARY KEY (id)"));
-    }
-
-    static void hubbleWriteWorkItems(DatabaseClient dbClient,
-				     int numWorkItems,
-				     int mutationsPerTransaction) {
-	int numTransactions = numWorkItems / mutationsPerTransaction;
-	for (int i = 0; i < numTransactions; ++i) {
-	    List<Mutation> mutations = new ArrayList<>();
-	    for (int j = 0; j < mutationsPerTransaction; ++j) {
-		mutations.add(Mutation.newInsertBuilder("WorkList")
-			      .set("id").to(UUID.randomUUID().toString())
-			      .set("is_done").to(false)
-			      .build());
-	    }
-	    dbClient.write(mutations);
-	}
-    }
-
-    static boolean hubbleDoWorkSingleTransaction(DatabaseClient dbClient,
-						 boolean doneValue) {
-	String stmt = String.format("SELECT * FROM WorkList WHERE is_done is %b LIMIT 100", !doneValue);
-	boolean didWork =
-	    dbClient.readWriteTransaction()
-	        .run(transaction -> {
-			Random random = new Random();
-			ResultSet resultSet = transaction.executeQuery(Statement.of(stmt));
-			List<List<Object>> rows = resultSet.getRows();
-			resultSet.close();
-			if (rows.size() == 0) return false;
-			int randIdx = random.nextInt(resultSet.size());
-			String id = rows.get(randIdx).get(0);
-			System.out.printf("Doing work: %s\n", id);
-			transaction.buffer(
-			   Mutation.newUpdateBuilder("WorkList")
-			   .set("id").to(id)
-			   .set("is_done").to(doneValue)
-			   .build());
-			return true;
-		    });
-	return didWork;
-    }
-
-    static void hubbleDoWorkSingleTransactionSerial(DatabaseClient dbClient,
-						    boolean doneValue) {
-	boolean workRemaining = true;
-	int workDone = 0;
-	while (workRemaining) {
-	    workRemaining = hubbleDoWorkSingleTransaction(dbClient, doneValue);
-	    if (workDone++ % 1000 == 0) {
-		System.out.printf(">>>>>>>>>>>>>>>> Done %d work <<<<<<<<<<<<<\n", workDone);
-	    }
-	}
-    }
-
-    static void hubbleDoWorkSingleTransactionParallel(DatabaseClient dbClient,
-						      boolean doneValue) {
-	int numProcessors = Runtime.getRuntime().availableProcessors();
-	ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-	
-	for (int i = 0; i < numProcessors; ++i) {
-	    executorService.submit(new Runnable() {
-		    @Override
-		    public void run() {
-			hubbleDoWorkSingleTransactionSerial(dbClient, doneValue);
-		    }
-		});
-	}
-	executorService.shutdown();
-	while (!executorService.isTerminated()) {}
-    }
-
-    static void hubbleWriteMailboxes(DatabaseClient dbClient, int numMailboxes) {
-	List<Mutation> mutations = new ArrayList<>();
-	for (int sid = 0; sid < numMailboxes; ++sid) {
-	    mutations.add(Mutation.newInsertBuilder("Mailbox")
-			  .set("sid").to(sid)
-			  .build());
-	}
-	dbClient.write(mutations);
-    }
-
-    static void hubbleWriteMessagesInterleaved(DatabaseClient dbClient,
-					       int numMailboxes,
-					       int mutationsPerTransaction,
-					       int numMinutes) {
-	Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
-	while (Instant.now().isBefore(doneTime)) {
-	    for (int mailbox = 0; mailbox < numMailboxes; ++mailbox) {
-		List<Mutation> mutations = new ArrayList<>();
-		for (int i = 0; i < mutationsPerTransaction; ++i) {
-		    mutations.add(Mutation.newInsertBuilder("Message")
-				  .set("sid").to(mailbox)
-				  .set("msg_id").to(UUID.randomUUID().toString())
-				  .set("body").to(loremIpsum)
-				  .build());
-		}
-		dbClient.write(mutations);
-	    }
-	}
-    }
-
-    static void hubbleWriteMessagesInterleavedParallel(DatabaseClient dbClient,
-						      int numMailboxes,
-						      int mutationsPerTransaction,
-						      int numMinutes) {
-	int numProcessors = Runtime.getRuntime().availableProcessors();
-	ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-	
-	for (int i = 0; i < numProcessors; ++i) {
-	    executorService.submit(new Runnable() {
-		    @Override
-		    public void run() {
-			hubbleWriteMessagesInterleaved(dbClient,
-						       numMailboxes,
-						       mutationsPerTransaction,
-						       numMinutes);
-		    }
-		});
-	}
-	executorService.shutdown();
-	while (!executorService.isTerminated()) {}
-    }	
-
-    static void hubbleWriteMessages(DatabaseClient dbClient,
-				    int mutationsPerTransaction,
-				    int numMinutes) {
-	Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
-	while (Instant.now().isBefore(doneTime)) {
-	    List<Mutation> mutations = new ArrayList<>();
-	    for (int i = 0; i < mutationsPerTransaction; ++i) {
-		mutations.add(Mutation.newInsertBuilder("Message")
-			      .set("msg_id").to(Instant.now().toString() + i)
-			      .set("body").to(loremIpsum)
-			      .build());
-	    }
-	    dbClient.write(mutations);
-	}
-    }
-
-    static void hubbleWriteMessagesUUID(DatabaseClient dbClient,
-					int mutationsPerTransaction,
-					int numMinutes) {
-	Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
-	while (Instant.now().isBefore(doneTime)) {
-	    List<Mutation> mutations = new ArrayList<>();
-	    for (int i = 0; i < mutationsPerTransaction; ++i) {
-		mutations.add(Mutation.newInsertBuilder("Message")
-			      .set("msg_id").to(UUID.randomUUID().toString())
-			      .set("body").to(loremIpsum)
-			      .build());
-	    }
-	    dbClient.write(mutations);
-	}
-    }
-
-    static void hubbleWriteMessagesParallel(DatabaseClient dbClient,
-					    int mutationsPerTransaction,
-					    int numMinutes) {
-	int numProcessors = Runtime.getRuntime().availableProcessors();
-	ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-	
-	for (int i = 0; i < numProcessors; ++i) {
-	    executorService.submit(new Runnable() {
-		    @Override
-		    public void run() {
-			hubbleWriteMessages(dbClient,
-					    mutationsPerTransaction,
-					    numMinutes);
-		    }
-		});
-	}
-	executorService.shutdown();
-	while (!executorService.isTerminated()) {}
-    }	
-
-    static void hubbleWriteMessagesParallelUUID(DatabaseClient dbClient,
-						int mutationsPerTransaction,
-						int numMinutes) {
-	int numProcessors = Runtime.getRuntime().availableProcessors();
-	ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-	
-	for (int i = 0; i < numProcessors; ++i) {
-	    executorService.submit(new Runnable() {
-		    @Override
-		    public void run() {
-			hubbleWriteMessagesUUID(dbClient,
-						mutationsPerTransaction,
-						numMinutes);
-		    }
-		});
-	}
-	executorService.shutdown();
-	while (!executorService.isTerminated()) {}
-    }
-
-    static void hubbleUpdates(DatabaseClient dbClient,
-			      List<List<String>> keys,
-			      int mutationsPerTransaction,
-			      int numMinutes) {
-	Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
-	Random random = new Random();
-	while (Instant.now().isBefore(doneTime)) {
-	    List<Mutation> mutations = new ArrayList<>();
-	    int sid = random.nextInt(keys.size());
-	    for (int i = 0; i < mutationsPerTransaction; ++i) {
-		String uuid = keys.get(sid).get(random.nextInt(keys.get(sid).size()));
-		mutations.add(Mutation.newUpdateBuilder("Message")
-			      .set("sid").to(sid)
-			      .set("msg_id").to(uuid)
-			      .set("body").to("updated!")
-			      .build());
-	    }
-	    dbClient.write(mutations);
-	}
-    }
-
-    static void hubbleReads(DatabaseClient dbClient,
-			     List<List<String>> keys,
-			     int mutationsPerTransaction,
-			     int numMinutes,
-			     boolean isStrong) {
-	Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
-	Random random = new Random();
-	while (Instant.now().isBefore(doneTime)) {
-	    KeySet.Builder keySetBuilder = KeySet.newBuilder();
-	    int sid = random.nextInt(keys.size());
-	    for (int i = 0; i < mutationsPerTransaction; ++i) {
-		String uuid = keys.get(sid).get(random.nextInt(keys.get(sid).size()));
-		keySetBuilder.addKey(Key.of(sid, uuid));
-	    }
-	    if (isStrong) {
-		ResultSet throwaway = dbClient
-		    .singleUse()
-		    .read("Message",
-			  keySetBuilder.build(),
-			  Arrays.asList("body"));
-		while (throwaway.next()) {}
-	    } else {
-		ResultSet throwaway = dbClient
-		    .singleUse(TimestampBound.ofMaxStaleness(15, TimeUnit.SECONDS))
-		    .read("Message",
-			  keySetBuilder.build(),
-			  Arrays.asList("body"));
-		while (throwaway.next()) {}
-	    }
-	}
-    }
-
-    static void hubbleUpdatesAndReads(DatabaseClient dbClient,
-				      int numMailboxes,
-				      int mutationsPerTransaction,
-				      int numRows,
-				      int numMinutes,
-				      boolean isStrong) {
-	List<List<String>> keys = new ArrayList<>(numMailboxes);
-	for (int i = 0; i < numMailboxes; ++i) {
-	    keys.add(new ArrayList<>(numRows / numMailboxes));
-	}
-
-
-	for (int sid = 0; sid < numMailboxes; ++sid) {
-	    for (int i = 0; i < numRows / numMailboxes / mutationsPerTransaction; ++i) {
-		List<Mutation> mutations = new ArrayList<>();
-		for (int j = 0; j < mutationsPerTransaction; ++j) {
-		    String uuid = UUID.randomUUID().toString();
-		    mutations.add(Mutation.newInsertBuilder("Message")
-				  .set("sid").to(sid)
-				  .set("msg_id").to(uuid)
-				  .set("body").to(loremIpsum)
-				  .build());
-		    keys.get(sid).add(uuid);
-		}
-		dbClient.write(mutations);
-	    }
-	}
-
-	System.out.println("Beginning workload.");
-	int numProcessors = Runtime.getRuntime().availableProcessors() / 2;
-	ExecutorService writeExecutor = Executors.newFixedThreadPool(numProcessors);
-	ExecutorService readExecutor = Executors.newFixedThreadPool(numProcessors);
-
-	for (int i = 0; i < numProcessors; ++i) {
-	    writeExecutor.submit(new Runnable() {
-		    @Override
-		    public void run() {
-			hubbleUpdates(dbClient,
-				      keys,
-				      mutationsPerTransaction,
-				      numMinutes);
-		    }
-		});
-
-	    readExecutor.submit(new Runnable() {
-		    @Override
-		    public void run() {
-			hubbleReads(dbClient,
-				    keys,
-				    mutationsPerTransaction,
-				    numMinutes,
-				    isStrong);
-		    }
-		});
-	}
-
-	writeExecutor.shutdown();
-	readExecutor.shutdown();
-	while (!writeExecutor.isTerminated()) {}
-	while (!readExecutor.isTerminated()) {}
-    }
-
   static void run(
       DatabaseClient dbClient,
       DatabaseAdminClient dbAdminClient,
@@ -2368,51 +2018,52 @@ public class SpannerSample {
       String command,
       DatabaseId database,
       BackupId backup) {
+      CodeLab1 codeLab1=new CodeLab1();
     switch (command) {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
         break;
       case "hubbleCreateMessages":
-	hubbleCreateMessages(dbAdminClient, database);
+          codeLab1.hubbleCreateMessages(dbAdminClient, database);
 	break;
       case "hubbleWriteMessages1":
-	hubbleWriteMessages(dbClient, 1, 5);
+          codeLab1.hubbleWriteMessages(dbClient, 1, 5);
 	break;
       case "hubbleWriteMessages50":
-	hubbleWriteMessages(dbClient, 50, 5);
+          codeLab1.hubbleWriteMessages(dbClient, 50, 5);
 	break;
       case "hubbleWriteMessagesParallel":
-	hubbleWriteMessagesParallel(dbClient, 50, 5);
+          codeLab1.hubbleWriteMessagesParallel(dbClient, 50, 5);
 	break;
       case "hubbleWriteMessagesParallelUUID":
-	hubbleWriteMessagesParallelUUID(dbClient, 50, 5);
+          codeLab1.hubbleWriteMessagesParallelUUID(dbClient, 50, 5);
 	break;
       case "hubbleCreateInterleaved":
-	hubbleCreateInterleaved(dbAdminClient, database);
+          codeLab1.hubbleCreateInterleaved(dbAdminClient, database);
 	break;
       case "hubbleWriteMailboxes":
-	hubbleWriteMailboxes(dbClient, 40);
+          codeLab1.hubbleWriteMailboxes(dbClient, 40);
 	break;
       case "hubbleWriteMessagesInterleavedParallel":
-	hubbleWriteMessagesInterleavedParallel(dbClient, 40, 50, 5);
+          codeLab1.hubbleWriteMessagesInterleavedParallel(dbClient, 40, 50, 5);
 	break;
       case "hubbleUpdatesAndStrongReads":
-	hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, true);
+          codeLab1.hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, true);
 	break;
       case "hubbleUpdatesAndWeakReads":
-	hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, false);
+          codeLab1.hubbleUpdatesAndReads(dbClient, 40, 5, 1000, 5, false);
 	break;
       case "hubbleCreateWorkItems":
-	hubbleCreateWorkItems(dbAdminClient, database);
+          codeLab1.hubbleCreateWorkItems(dbAdminClient, database);
 	break;
       case "hubbleWriteWorkItems":
-	hubbleWriteWorkItems(dbClient, 10000, 50);
+          codeLab1.hubbleWriteWorkItems(dbClient, 10000, 50);
 	break;
       case "hubbleDoWorkSingleTransactionSerial":
-	hubbleDoWorkSingleTransactionSerial(dbClient, true);
+          codeLab1.hubbleDoWorkSingleTransactionSerial(dbClient, true);
 	break;
       case "hubbleDoWorkSingleTransactionParallel":
-	hubbleDoWorkSingleTransactionParallel(dbClient, false);
+          codeLab1.hubbleDoWorkSingleTransactionParallel(dbClient, false);
 	break;
       case "write":
         writeExampleData(dbClient);
