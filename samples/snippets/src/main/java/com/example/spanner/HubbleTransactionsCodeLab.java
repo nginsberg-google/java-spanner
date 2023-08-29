@@ -406,7 +406,6 @@ public class HubbleTransactionsCodeLab {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
     try {
       allOf.get(); // Wait for all threads to complete
-      System.out.println("All threads have finished.");
     } catch (InterruptedException | ExecutionException e) {
       e.printStackTrace();
     } finally {
