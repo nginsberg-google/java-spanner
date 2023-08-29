@@ -27,12 +27,11 @@ public class HubbleTransactionsCodeLab {
     createDatabase(
         dbAdminClient,
         id,
-        Collections.singletonList(
+        Arrays.asList(
             "CREATE TABLE Message("
                 + " msg_id STRING(MAX) NOT NULL,"
                 + " body STRING(MAX),"
                 + ") PRIMARY KEY (msg_id)"));
-    System.out.println("Finished execution of createMessages()");
   }
 
   public void createInterleaved(DatabaseAdminClient dbAdminClient, DatabaseId id) {
@@ -42,7 +41,6 @@ public class HubbleTransactionsCodeLab {
         Arrays.asList(
             "CREATE TABLE Mailbox("
                 + "sid INT64 NOT NULL,"
-                + "guid STRING(MAX),"
                 + "state STRING(MAX),"
                 + ") PRIMARY KEY (sid)",
             "CREATE TABLE Message("
@@ -54,27 +52,23 @@ public class HubbleTransactionsCodeLab {
                 + ") PRIMARY KEY (sid, msg_id),"
                 + "INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
 
-    System.out.println("Finished execution of createInterleaved()");
   }
 
   public void createWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
         dbAdminClient,
         id,
-        Collections.singletonList(
+        Arrays.asList(
             "CREATE TABLE WorkList("
                 + " id STRING(MAX) NOT NULL,"
                 + " is_done BOOL,"
-                + " generated_value Int64,"
                 + " timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true), "
                 + ") PRIMARY KEY (id)"));
-    System.out.println("Finished execution of createWorkItems()");
   }
 
   public void writeWorkItems(
       DatabaseClient dbClient, int numWorkItems, int mutationsPerTransaction) {
     int numTransactions = numWorkItems / mutationsPerTransaction;
-    int generatedValueCount = 1;
     for (int i = 0; i < numTransactions; ++i) {
       List<Mutation> mutations = new ArrayList<>();
       for (int j = 0; j < mutationsPerTransaction; ++j) {
@@ -84,12 +78,9 @@ public class HubbleTransactionsCodeLab {
                 .to(UUID.randomUUID().toString())
                 .set("is_done")
                 .to(false)
-                .set("generated_value")
-                .to(generatedValueCount)
                 .set("timestamp")
                 .to(Value.COMMIT_TIMESTAMP)
                 .build());
-        generatedValueCount++;
       }
       try {
         dbClient.write(mutations);
@@ -97,7 +88,6 @@ public class HubbleTransactionsCodeLab {
         throw new RuntimeException(e);
       }
     }
-    System.out.println("Finished execution of writeWorkItems()");
   }
 
   public boolean doWorkSingleTransaction(DatabaseClient dbClient, boolean doneValue) {
@@ -158,8 +148,6 @@ public class HubbleTransactionsCodeLab {
           Mutation.newInsertBuilder("Mailbox")
               .set("sid")
               .to(sid)
-              .set("guid")
-              .to(UUID.randomUUID().toString())
               .build());
     }
     try {
@@ -167,7 +155,6 @@ public class HubbleTransactionsCodeLab {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    System.out.println("Finished execution of writeMailboxes()");
   }
 
   private void writeMessagesInterleaved(
@@ -197,7 +184,6 @@ public class HubbleTransactionsCodeLab {
           throw new RuntimeException(e);
         }
       }
-      System.out.println("Finished execution of writeMessagesInterleaved()");
     }
   }
 
@@ -207,7 +193,6 @@ public class HubbleTransactionsCodeLab {
         () -> writeMessagesInterleaved(dbClient, numMailboxes, mutationsPerTransaction, numMinutes),
         EXECUTOR_SERVICE,
         NUM_PROCESSORS);
-    System.out.println("Finished execution of writeMessagesInterleavedParallel()");
   }
 
   public void writeMessages(DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
@@ -233,7 +218,6 @@ public class HubbleTransactionsCodeLab {
         throw new RuntimeException(e);
       }
     }
-    System.out.println("Finished execution of writeMessages()");
   }
 
   private void writeMessagesUUID(
@@ -260,7 +244,6 @@ public class HubbleTransactionsCodeLab {
         throw new RuntimeException(e);
       }
     }
-    System.out.println("Finished execution of writeMessagesUUID()");
   }
 
   public void writeMessagesParallel(
@@ -269,7 +252,6 @@ public class HubbleTransactionsCodeLab {
         () -> writeMessages(dbClient, mutationsPerTransaction, numMinutes),
         EXECUTOR_SERVICE,
         NUM_PROCESSORS);
-    System.out.println("Finished execution of writeMessagesParallel()");
   }
 
   public void writeMessagesParallelUUID(
@@ -278,7 +260,6 @@ public class HubbleTransactionsCodeLab {
         () -> writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes),
         EXECUTOR_SERVICE,
         NUM_PROCESSORS);
-    System.out.println("Finished execution of writeMessagesParallelUUID()");
   }
 
   public void updatesAndReads(
@@ -325,7 +306,6 @@ public class HubbleTransactionsCodeLab {
         () -> reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong),
         readExecutor,
         numProcessorsTemp);
-    System.out.println("Finished execution of updatesAndReads()");
   }
 
   private void createDatabase(
@@ -374,7 +354,6 @@ public class HubbleTransactionsCodeLab {
         throw new RuntimeException(e);
       }
     }
-    System.out.println("Finished execution of updates()");
   }
 
   private void reads(
@@ -396,17 +375,16 @@ public class HubbleTransactionsCodeLab {
         ResultSet throwaway =
             dbClient
                 .singleUse()
-                .read("Message", keySetBuilder.build(), Collections.singletonList("body"));
+                .read("Message", keySetBuilder.build(), Arrays.asList("body"));
         while (throwaway.next()) {}
       } else {
         ResultSet throwaway =
             dbClient
                 .singleUse(TimestampBound.ofMaxStaleness(15, TimeUnit.SECONDS))
-                .read("Message", keySetBuilder.build(), Collections.singletonList("body"));
+                .read("Message", keySetBuilder.build(), Arrays.asList("body"));
         while (throwaway.next()) {}
       }
     }
-    System.out.println("Finished execution of reads()");
   }
 
   private void executeTasksInParallel(
@@ -434,6 +412,5 @@ public class HubbleTransactionsCodeLab {
     } finally {
       executorService.shutdown();
     }
-    System.out.println("Finished execution of executeTasksInParallel()");
   }
 }
