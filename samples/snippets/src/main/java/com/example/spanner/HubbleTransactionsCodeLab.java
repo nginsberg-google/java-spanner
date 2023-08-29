@@ -62,6 +62,7 @@ public class HubbleTransactionsCodeLab {
             "CREATE TABLE WorkList("
                 + " id STRING(MAX) NOT NULL,"
                 + " is_done BOOL,"
+                + " generated_value STRING(MAX) NOT NULL,"
                 + " timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true), "
                 + ") PRIMARY KEY (id)"));
   }
@@ -78,6 +79,8 @@ public class HubbleTransactionsCodeLab {
                 .to(UUID.randomUUID().toString())
                 .set("is_done")
                 .to(false)
+                .set("generated_value")
+                .to(UUID.randomUUID().toString())
                 .set("timestamp")
                 .to(Value.COMMIT_TIMESTAMP)
                 .build());
@@ -90,65 +93,10 @@ public class HubbleTransactionsCodeLab {
     }
   }
 
-  public boolean doWorkSingleTransaction(DatabaseClient dbClient, boolean doneValue) {
-    String stmt = String.format("SELECT * FROM WorkList WHERE is_done is %b LIMIT 100", !doneValue);
-    // Below code will be removed in next PR.
-    //    boolean didWork =
-    //            dbClient.readWriteTransaction()
-    //                    .run(transaction -> {
-    //                      Random random = new Random();
-    //                      ResultSet resultSet = transaction.executeQuery(Statement.of(stmt));
-    //                      List<List<Object>> rows = resultSet.getRows();
-    //                      resultSet.close();
-    //                      if (rows.size() == 0) return false;
-    //                      int randIdx = random.nextInt(resultSet.size());
-    //                      String id = rows.get(randIdx).get(0);
-    //                      System.out.printf("Doing work: %s\n", id);
-    //                      transaction.buffer(
-    //                              Mutation.newUpdateBuilder("WorkList")
-    //                                      .set("id").to(id)
-    //                                      .set("is_done").to(doneValue)
-    //                                      .build());
-    //                      return true;
-    //                    });
-    //    return didWork;
-    return true;
-  }
-
-  public void doWorkSingleTransactionSerial(DatabaseClient dbClient, boolean doneValue) {
-    boolean workRemaining = true;
-    int workDone = 0;
-    while (workRemaining) {
-      workRemaining = doWorkSingleTransaction(dbClient, doneValue);
-      if (workDone++ % 1000 == 0) {
-        System.out.printf(">>>>>>>>>>>>>>>> Done %d work <<<<<<<<<<<<<\n", workDone);
-      }
-    }
-  }
-
-  public void doWorkSingleTransactionParallel(DatabaseClient dbClient, boolean doneValue) {
-
-    for (int i = 0; i < NUM_PROCESSORS; ++i) {
-      EXECUTOR_SERVICE.submit(
-          new Runnable() {
-            @Override
-            public void run() {
-              doWorkSingleTransactionSerial(dbClient, doneValue);
-            }
-          });
-    }
-    EXECUTOR_SERVICE.shutdown();
-    while (!EXECUTOR_SERVICE.isTerminated()) {}
-  }
-
   public void writeMailboxes(DatabaseClient dbClient, int numMailboxes) {
     List<Mutation> mutations = new ArrayList<>();
     for (int sid = 0; sid < numMailboxes; ++sid) {
-      mutations.add(
-          Mutation.newInsertBuilder("Mailbox")
-              .set("sid")
-              .to(sid)
-              .build());
+      mutations.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(sid).build());
     }
     try {
       dbClient.write(mutations);
@@ -308,6 +256,178 @@ public class HubbleTransactionsCodeLab {
         numProcessorsTemp);
   }
 
+  public void doWorkSingleTransactionParallelLocking(DatabaseClient dbClient) {
+    // getting the available processor
+    int numProcessors = Runtime.getRuntime().availableProcessors();
+    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+
+    List<Future<Integer>> futures = new ArrayList<>();
+    // List to store the count of total number of workItem(row) which has not yet completed means
+    // is_done is false.
+    List<String> workItemCount = new ArrayList<>();
+    // Below logic is reading the generated_value for the rows which are having is_done=false. We
+    // have added generated_value column value in incremented order starting from 1 in the table.
+    // This will help us to assign executing the random workItem(rows) work without overlapping. As
+    // each thread will pick up different generated_value to query.
+    try (ResultSet resultSet =
+        dbClient
+            .singleUse() // Execute a single read or query against Cloud Spanner.
+            // Below query can be parameterized to but kept here for simplicity
+            .executeQuery(
+                Statement.of("SELECT generated_value FROM WorkList WHERE is_done is false"))) {
+      while (resultSet.next()) {
+        workItemCount.add(resultSet.getString(0));
+      }
+    }
+
+    if (workItemCount.size() == 0) {
+      System.out.println(
+          "There is no workItem left to process, please update the is_done value to false, or add more work item in the table");
+      return;
+    }
+
+    // Assigning each thread the amount of work equally
+    for (int i = 0; i < numProcessors; ++i) {
+      // Each thread get the index from this loop, total workItem to be processed and number of
+      // thread (numProcessors) available for processing.
+      // E.g In case of 10 threads and 30 workItem the assignment for this method would be like
+
+      // Thread 1: ThreadIndex(i) 0, workitem 30
+      // Thread 2: ThreadIndex(i) 1  workitem 30
+      // Thread 3: ThreadIndex(i) 2  workitem 30
+      // ...
+      // Thread 10: ThreadIndex(i) 9  workitem 30
+      // These values will be determined by received by each thread(an object of WorkItemProcessor)
+      // while executing based on the input values passed here.
+      String lockQueryInTransaction =
+          "SELECT * FROM WorkList WHERE is_done is false and generated_value= '%s';";
+      Callable<Integer> callable =
+          new WorkItemProcessor<>(
+              workItemCount, i, numProcessors, dbClient, lockQueryInTransaction);
+      // Submitting each thread
+      Future<Integer> future = executorService.submit(callable);
+      futures.add(future);
+    }
+    int totalProcessed = 0;
+    // Calling the get on the future to wait for thread to finish and get the result.
+    try {
+      for (Future<Integer> future : futures) {
+
+        totalProcessed += future.get();
+      }
+
+      executorService.shutdown();
+      // Waiting for all thread to finish
+      executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public void doWorkSingleTransactionParallelNonLocking(DatabaseClient dbClient) {
+    // getting the available processor
+    int numProcessors = Runtime.getRuntime().availableProcessors();
+    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+
+    List<Future<Integer>> futures = new ArrayList<>();
+    // This is the store the count of total number of workItem(row) which has not yet completed
+    // means  is_done is false.
+    List<String> workItemCount = new ArrayList<>();
+    // Below logic is reading the id(primary key) for the rows which are having is_done=false. This
+    // will help us to read the different ids by different thread randomly.
+    try (ResultSet resultSet =
+        dbClient
+            .singleUse() // Execute a single read or query against Cloud Spanner.
+            .executeQuery(Statement.of("SELECT id FROM WorkList WHERE is_done is false;"))) {
+      while (resultSet.next()) {
+        workItemCount.add(resultSet.getString(0));
+      }
+    }
+
+    if (workItemCount.size() == 0) {
+      System.out.println(
+          "There is no workItem left to process, please update the is_done value to false, or add more work item in the table");
+      return;
+    }
+
+    // Assigning each thread the amount of work equally
+    for (int i = 0; i < numProcessors; ++i) {
+      // Each thread get the index from this loop, total workItem to be processed and number of
+      // thread (numProcessors) available for processing.
+      // E.g In case of 10 threads and 30 workItem the assignment for this method would be like
+
+      // Thread 1: ThreadIndex(i) 0, workitem 30
+      // Thread 2: ThreadIndex(i) 1  workitem 30
+      // Thread 3: ThreadIndex(i) 2  workitem 30
+      // ...
+      // Thread 10: ThreadIndex(i) 9  workitem 30
+      // These values will be determined by received by each thread(an object of WorkItemProcessor)
+      // while executing based on the input values passed here.
+      String nonLockQueryInTransaction =
+          "SELECT * FROM WorkList WHERE is_done is false and id= '%s';";
+      Callable<Integer> callable =
+          new WorkItemProcessor<>(
+              workItemCount, i, numProcessors, dbClient, nonLockQueryInTransaction);
+      // Submitting each thread
+      Future<Integer> future = executorService.submit(callable);
+      futures.add(future);
+    }
+    int totalProcessed = 0;
+    // Calling the get on the future to wait for thread to finish and get the result.
+    try {
+      for (Future<Integer> future : futures) {
+
+        totalProcessed += future.get();
+      }
+      executorService.shutdown();
+      executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public void writeMessagesInterleavedParallel100k(
+      DatabaseClient dbClient,
+      int numMailboxes,
+      int numberOfMessages) {
+
+    final int mutationsPerTransactionTemp = numberOfMessages / numMailboxes / NUM_PROCESSORS;
+
+    executeTasksInParallel(
+        () ->
+            hubbleWriteMessagesInterleaved100K(dbClient, numMailboxes, mutationsPerTransactionTemp),
+        EXECUTOR_SERVICE,
+        NUM_PROCESSORS);
+  }
+
+  public void hubbleWriteMessagesInterleaved100K(
+      DatabaseClient dbClient, int numMailboxes, int mutationsPerTransaction) {
+    for (int mailbox = 0; mailbox < numMailboxes; ++mailbox) {
+
+      List<Mutation> mutations = new ArrayList<>();
+      for (int i = 0; i < mutationsPerTransaction; ++i) {
+        mutations.add(
+            Mutation.newInsertBuilder("Message")
+                .set("sid")
+                .to(mailbox)
+                .set("msg_id")
+                .to(UUID.randomUUID().toString())
+                .set("subject")
+                .to(String.format(SUBJECT, i))
+                .set("body")
+                .to(LOREM_IPSUM)
+                .set("send_timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
+                .build());
+      }
+      try {
+        dbClient.write(mutations);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
   private void createDatabase(
       DatabaseAdminClient dbAdminClient, DatabaseId id, List<String> schema) {
     OperationFuture<Database, CreateDatabaseMetadata> op =
@@ -373,9 +493,7 @@ public class HubbleTransactionsCodeLab {
       }
       if (isStrong) {
         ResultSet throwaway =
-            dbClient
-                .singleUse()
-                .read("Message", keySetBuilder.build(), Arrays.asList("body"));
+            dbClient.singleUse().read("Message", keySetBuilder.build(), Arrays.asList("body"));
         while (throwaway.next()) {}
       } else {
         ResultSet throwaway =
@@ -410,6 +528,114 @@ public class HubbleTransactionsCodeLab {
       e.printStackTrace();
     } finally {
       executorService.shutdown();
+    }
+  }
+
+  /**
+   * Represents a task to process workItem(rows) in parallel, distributing work among threads based
+   * on a specific value.
+   */
+  static class WorkItemProcessor<T> implements Callable<Integer> {
+    private final List<T> totalWorkItem;
+    private final int threadIndex;
+    private final int numThreads;
+    private final DatabaseClient dbClient;
+    private final String query;
+
+    /**
+     * Constructs a WorkItemProcessor with the given parameters.
+     *
+     * @param totalWorkItem The list of workitems(rows) to be processed.
+     * @param numThreads The total number of threads.
+     * @param threadIndex The index of the current thread.
+     * @param dbClient Spanner DatabaseClient.
+     */
+    public WorkItemProcessor(
+        List<T> totalWorkItem,
+        int threadIndex,
+        int numThreads,
+        DatabaseClient dbClient,
+        String query) {
+      this.totalWorkItem = totalWorkItem;
+      this.threadIndex = threadIndex;
+      this.numThreads = numThreads;
+      this.dbClient = dbClient;
+      this.query = query;
+    }
+
+    /**
+     * Runs the thread, processing rows based on distribution values.
+     *
+     * <p>The method iterates through the rows, distributing work among threads based on their
+     * indices. Each thread processes rows starting from its {@code threadIndex} and then
+     * incrementing by {@code numThreads} for subsequent rows, ensuring even distribution of work
+     * among threads. If the number of rows is not a multiple of the number of threads, some threads
+     * may process fewer rows.
+     */
+    public Integer call() {
+      int count = 0;
+      // Each thread will loop here to process as many rows as possible with in the given limit.
+      // E.g Thread 1 will have row=1(startrow/threadIndex), then 11,21,31,41(using logic row +=
+      // numThreads)...
+      // Thread 2 will have row=2(startrow/threadIndex), then 22,32,42,52(using logic row +=
+      // numThreads)...
+      // Due to this reason while creating the thread object all these values are passed and
+      // startRow value is set.
+      for (int i = threadIndex; i <= totalWorkItem.size(); i += numThreads) {
+
+        if (i < totalWorkItem.size()) {
+          T row = totalWorkItem.get(i);
+          processWorkItem(row, dbClient);
+        }
+        count++;
+      }
+      return count;
+    }
+
+    /*
+        Method to process the workItem using the readWriteTransaction(). In case of a locking method, you may observe
+        extended processing time for the line "Doing work Id: ..", involving the same 'generated_value' and 'id'. This behavior
+        stems from issues like lock contention and other locking-related problems in Spanner. As a result,
+        Spanner can't complete thread execution within a single execution cycle (which is the expected behavior for this test).
+
+        Despite using a specific value for row processing, the 'column' isn't indexed. Consequently, a
+        full table scan occurs. This is exacerbated by the read/write transaction nature, which prevents
+        the realization of multithreading benefits.
+
+        When this method is invoked by another non-locking method that uses the 'id' (primary key) column
+        to fetch data, this issue won't be encountered.
+    */
+    private void processWorkItem(T row, DatabaseClient dbClient) {
+      // Select the specific row from the table. generated_value is passing in the query which will
+      // fetch a specific row from the table.
+      // This way distribution of random processing is easy and deterministic.
+      String stmt = String.format(query, row);
+      boolean didWork =
+          // Starting a readwrite transaction.
+          Boolean.TRUE.equals(
+              dbClient
+                  .readWriteTransaction()
+                  .run(
+                      transaction -> {
+                        ResultSet resultSet = transaction.executeQuery(Statement.of(stmt));
+                        while (resultSet.next()) {
+                          String id = resultSet.getString("id");
+                          String generatedValue = resultSet.getString("generated_value");
+                          System.out.printf(
+                              "Doing work Id: %s, Generated Value: %s\n", id, generatedValue);
+                          transaction.buffer(
+                              Mutation.newUpdateBuilder("WorkList")
+                                  .set("id")
+                                  .to(id)
+                                  .set("is_done")
+                                  .to(true)
+                                  .set("timestamp")
+                                  .to(Value.COMMIT_TIMESTAMP)
+                                  .build());
+                        }
+                        return true;
+                      }));
+//      System.out.println("WorkItem is completed ::" + didWork + ",processing row:" + row);
     }
   }
 }

@@ -69,8 +69,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.threeten.bp.LocalDate;
 import org.threeten.bp.LocalDateTime;
@@ -1956,14 +1954,17 @@ public class SpannerSample {
           hubbleTransactionsCodeLab.createWorkItems(dbAdminClient, database);
 	break;
       case "transactionLabWriteWorkItems":
-          hubbleTransactionsCodeLab.writeWorkItems(dbClient, 10000, 50);
+          hubbleTransactionsCodeLab.writeWorkItems(dbClient, 1000, 50);
 	break;
-      case "transactionLabDoWorkSingleTransactionSerial":
-          hubbleTransactionsCodeLab.doWorkSingleTransactionSerial(dbClient, true);
+      case "transactionLabDoWorkSingleTransactionParallelLocking":
+          hubbleTransactionsCodeLab.doWorkSingleTransactionParallelLocking(dbClient);
 	break;
-      case "transactionLabDoWorkSingleTransactionParallel":
-          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
-	break;
+      case "transactionLabDoWorkSingleTransactionParallelNonLocking":
+          hubbleTransactionsCodeLab.doWorkSingleTransactionParallelNonLocking(dbClient);
+    break;
+      case "hubbleWriteMessagesInterleavedParallel100k":
+    hubbleTransactionsCodeLab.writeMessagesInterleavedParallel100k(dbClient, 40, 100000);
+    break;
       case "write":
         writeExampleData(dbClient);
         break;
