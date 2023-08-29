@@ -1918,6 +1918,7 @@ public class SpannerSample {
       DatabaseId database,
       BackupId backup) {
       HubbleTransactionsCodeLab hubbleTransactionsCodeLab=new HubbleTransactionsCodeLab();
+      QueryLab queryLab=new QueryLab();
     switch (command) {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
@@ -1964,6 +1965,12 @@ public class SpannerSample {
       case "transactionLabDoWorkSingleTransactionParallel":
           hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
 	break;
+      case "queryLabCreateJoinTables":
+        queryLab.createJoinTables(dbAdminClient, database);
+    break;
+      case "queryLabInsertTestDataToJoinTables":
+        queryLab.insertTestDataToJoinTables(dbClient, 50, 100000);
+    break;
       case "write":
         writeExampleData(dbClient);
         break;
