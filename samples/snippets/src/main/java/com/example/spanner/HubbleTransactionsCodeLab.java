@@ -14,8 +14,12 @@ import java.util.concurrent.*;
  */
 public class HubbleTransactionsCodeLab {
 
-  private static final String loremIpsum =
+  private static final String LOREM_IPSUM =
       "Aenean sit amet lectus est. Nullam ornare ligula luctus auctor placerat. Morbi fermentum volutpat massa, sit amet consectetur metus vehicula sed. Sed auctor scelerisque tempus. Morbi hendrerit tortor et felis scelerisque, at fermentum risus posuere. Suspendisse finibus, tellus eu ullamcorper posuere, odio ex pulvinar est, a malesuada libero turpis quis massa. Quisque placerat lacus orci. Proin ac viverra metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus cursus rhoncus iaculis. Pellentesque nisl tellus, venenatis nec erat sit amet, eleifend porttitor nisl. Maecenas fringilla ex id mauris facilisis, sed luctus dui elementum. Suspendisse ac orci lectus. Suspendisse vitae sapien convallis, commodo leo ut, ultricies arcu. Fusce pellentesque sem vestibulum, sodales purus eget, auctor odio. Ut et nunc metus. Aenean ac ex faucibus, tristique nibh ut, euismod lorem. Fusce a ex ut nibh consectetur mollis. Aenean suscipit elit dui, faucibus vestibulum leo commodo a. Nulla ultricies vitae velit cursus commodo. Morbi eu sapien in magna condimentum porta quis eget sem. Etiam tempor auctor diam, quis mollis odio scelerisque et. Fusce tempus mauris mi, et varius enim condimentum in. Aliquam nisi lorem, pulvinar id ullamcorper vitae, fringilla vel leo. Fusce vehicula tincidunt vulputate. Vivamus efficitur nunc quis lorem porttitor elementum. Donec ex neque, vestibulum nec mollis quis, lacinia quis dui. Nullam rhoncus quis lacus nec euismod. Vivamus porttitor sem nec nisl auctor ultrices. Vivamus non laoreet lectus. Aliquam condimentum semper libero eu elementum. Nullam lobortis ultricies gravida. Integer in lacinia lacus, ac consequat magna. Suspendisse et risus vel diam facilisis ornare a in arcu. Nulla nec nunc sem. Cras aliquam nulla sem, luctus maximus est gravida ut. Ut pellentesque pharetra convallis. Quisque molestie, ipsum sit amet scelerisque convallis, magna ante fringilla massa, in blandit turpis nibh ornare magna. Curabitur mi tortor, feugiat id sem ac, scelerisque congue tortor. Aenean non viverra risus. Praesent vel enim quis dolor auctor aliquet. Maecenas faucibus mi at venenatis suscipit. Integer interdum magna vitae mauris interdum, laoreet ullamcorper erat tincidunt. Morbi vel ipsum convallis, semper quam vitae, sagittis tellus. In facilisis eu lorem imperdiet laoreet. Suspendisse gravida a magna et condimentum. Suspendisse vitae risus vitae est pulvinar convallis at sit amet sem. Morbi vel imperdiet leo, sit amet cursus urna. Pellentesque suscipit ut neque non laoreet. Duis non ipsum ipsum. Quisque ut porttitor dui. Duis nulla augue, varius quis tellus sed, efficitur bibendum justo. Cras vestibulum congue ante in gravida. Quisque tincidunt nisi nisl, sed vulputate leo luctus ac. Pellentesque quis tempor leo, sed faucibus ipsum. Donec rutrum turpis nec auctor lobortis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed lobortis sodales risus vitae eleifend. Nullam pharetra dapibus lobortis. Vestibulum nisl diam, dignissim sit amet lacus sit amet, venenatis auctor nisi. Phasellus sollicitudin tortor a mi fringilla, imperdiet tristique ex feugiat. Nulla ut vehicula metus, nec tempus odio. Phasellus pellentesque lacus lacus, fringilla egestas felis hendrerit ac. Nam suscipit orci eros, at molestie nunc tincidunt id. Aliquam maximus finibus leo. Vestibulum orci turpis, fringilla eget lorem id, cursus consequat tortor. Suspendisse efficitur purus lectus, ac ornare sem lobortis a. Interdum et malesuada fames ac ante ipsum primis in faucibus. Sed sodales id mi eu aliquam. Curabitur enim libero, tempor vel vestibulum id, eleifend at lacus. Maecenas ut feugiat justo, nec dictum justo. Nulla porttitor accumsan rhoncus. Cras ligula velit, molestie sit amet molestie sed, commodo et libero. Etiam eu condimentum arcu. Aliquam erat volutpat. Nullam sit amet urna ipsum. Vestibulum at velit id velit tincidunt ultricies a ut metus. In vitae mollis diam. Proin lacinia fringilla purus vitae aliquet. Vestibulum a tincidunt eros. Aenean imperdiet aliquet arcu, vitae euismod turpis fermentum quis. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Suspendisse potenti. Pellentesque quis efficitur mauris, pulvinar sagittis ante. Cras efficitur porta convallis. Nullam eleifend congue finibus. Nam sodales tincidunt odio ac elementum. Sed sem risus, imperdiet quis suscipit eu, imperdiet vitae nibh. Morbi gravida neque ac sodales varius. In convallis massa vel lectus fermentum ultricies ac vitae eros. Sed justo sem, dignissim sit amet tempus ultrices, pellentesque at libero. Quisque a quam volutpat, tristique erat a, auctor enim. Suspendisse finibus arcu erat, nec mattis tortor facilisis in. Donec ornare mattis lorem, in interdum turpis venenatis vel. Mauris tempus porttitor libero. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vivamus eget tempor dui. Nunc et elit eu eros tincidunt sapien.";
+
+  private static final String SUBJECT = "Random subject for the email for testing purpose %s";
+
+  private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
   public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
@@ -34,15 +38,17 @@ public class HubbleTransactionsCodeLab {
         id,
         Arrays.asList(
             "CREATE TABLE Mailbox("
-                + " sid INT64 NOT NULL,"
-                + " state STRING(MAX),"
+                + "sid INT64 NOT NULL,"
+                + "state STRING(MAX),"
                 + ") PRIMARY KEY (sid)",
             "CREATE TABLE Message("
                 + " sid INT64 NOT NULL,"
                 + " msg_id STRING(MAX) NOT NULL,"
+                + " subject STRING(MAX),"
                 + " body STRING(MAX),"
+                + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
                 + ") PRIMARY KEY (sid, msg_id),"
-                + " INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
+                + "INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
   }
 
   public void createWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
@@ -53,6 +59,7 @@ public class HubbleTransactionsCodeLab {
             "CREATE TABLE WorkList("
                 + " id STRING(MAX) NOT NULL,"
                 + " is_done BOOL,"
+                + " timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true), "
                 + ") PRIMARY KEY (id)"));
   }
 
@@ -68,9 +75,15 @@ public class HubbleTransactionsCodeLab {
                 .to(UUID.randomUUID().toString())
                 .set("is_done")
                 .to(false)
+                .set("timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
                 .build());
       }
-      dbClient.write(mutations);
+      try {
+        dbClient.write(mutations);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -111,10 +124,8 @@ public class HubbleTransactionsCodeLab {
   }
 
   public void doWorkSingleTransactionParallel(DatabaseClient dbClient, boolean doneValue) {
-    int numProcessors = Runtime.getRuntime().availableProcessors();
-    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-
-    for (int i = 0; i < numProcessors; ++i) {
+    ExecutorService executorService = Executors.newFixedThreadPool(NUM_PROCESSORS);
+    for (int i = 0; i < NUM_PROCESSORS; ++i) {
       executorService.submit(
           new Runnable() {
             @Override
@@ -132,10 +143,14 @@ public class HubbleTransactionsCodeLab {
     for (int sid = 0; sid < numMailboxes; ++sid) {
       mutations.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(sid).build());
     }
-    dbClient.write(mutations);
+    try {
+      dbClient.write(mutations);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  public void writeMessagesInterleaved(
+  private void writeMessagesInterleaved(
       DatabaseClient dbClient, int numMailboxes, int mutationsPerTransaction, int numMinutes) {
     Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
     while (Instant.now().isBefore(doneTime)) {
@@ -148,31 +163,28 @@ public class HubbleTransactionsCodeLab {
                   .to(mailbox)
                   .set("msg_id")
                   .to(UUID.randomUUID().toString())
+                  .set("subject")
+                  .to(String.format(SUBJECT, i))
                   .set("body")
-                  .to(loremIpsum)
+                  .to(LOREM_IPSUM)
+                  .set("send_timestamp")
+                  .to(Value.COMMIT_TIMESTAMP)
                   .build());
         }
-        dbClient.write(mutations);
+        try {
+          dbClient.write(mutations);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
       }
     }
   }
 
   public void writeMessagesInterleavedParallel(
       DatabaseClient dbClient, int numMailboxes, int mutationsPerTransaction, int numMinutes) {
-    int numProcessors = Runtime.getRuntime().availableProcessors();
-    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-
-    for (int i = 0; i < numProcessors; ++i) {
-      executorService.submit(
-          new Runnable() {
-            @Override
-            public void run() {
-              writeMessagesInterleaved(dbClient, numMailboxes, mutationsPerTransaction, numMinutes);
-            }
-          });
-    }
-    executorService.shutdown();
-    while (!executorService.isTerminated()) {}
+    executeTasksInParallel(
+        () -> writeMessagesInterleaved(dbClient, numMailboxes, mutationsPerTransaction, numMinutes),
+        NUM_PROCESSORS);
   }
 
   public void writeMessages(DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
@@ -184,15 +196,23 @@ public class HubbleTransactionsCodeLab {
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
                 .to(Instant.now().toString() + i)
+                .set("SUBJECT")
+                .to(String.format(SUBJECT, i))
                 .set("body")
-                .to(loremIpsum)
+                .to(LOREM_IPSUM)
+                .set("send_timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
                 .build());
       }
-      dbClient.write(mutations);
+      try {
+        dbClient.write(mutations);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
-  public void writeMessagesUUID(
+  private void writeMessagesUUID(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
     while (Instant.now().isBefore(doneTime)) {
@@ -201,49 +221,33 @@ public class HubbleTransactionsCodeLab {
         mutations.add(
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
-                .to(UUID.randomUUID().toString())
+                .to(Instant.now().toString() + i)
+                .set("SUBJECT")
+                .to(String.format(SUBJECT, i))
                 .set("body")
-                .to(loremIpsum)
+                .to(LOREM_IPSUM)
+                .set("send_timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
                 .build());
       }
-      dbClient.write(mutations);
+      try {
+        dbClient.write(mutations);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
   public void writeMessagesParallel(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
-    int numProcessors = Runtime.getRuntime().availableProcessors();
-    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-
-    for (int i = 0; i < numProcessors; ++i) {
-      executorService.submit(
-          new Runnable() {
-            @Override
-            public void run() {
-              writeMessages(dbClient, mutationsPerTransaction, numMinutes);
-            }
-          });
-    }
-    executorService.shutdown();
-    while (!executorService.isTerminated()) {}
+    executeTasksInParallel(
+        () -> writeMessages(dbClient, mutationsPerTransaction, numMinutes), NUM_PROCESSORS);
   }
 
   public void writeMessagesParallelUUID(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
-    int numProcessors = Runtime.getRuntime().availableProcessors();
-    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
-
-    for (int i = 0; i < numProcessors; ++i) {
-      executorService.submit(
-          new Runnable() {
-            @Override
-            public void run() {
-              writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes);
-            }
-          });
-    }
-    executorService.shutdown();
-    while (!executorService.isTerminated()) {}
+    executeTasksInParallel(
+        () -> writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes), NUM_PROCESSORS);
   }
 
   public void updatesAndReads(
@@ -270,7 +274,7 @@ public class HubbleTransactionsCodeLab {
                   .set("msg_id")
                   .to(uuid)
                   .set("body")
-                  .to(loremIpsum)
+                  .to(LOREM_IPSUM)
                   .build());
           keys.get(sid).add(uuid);
         }
@@ -279,32 +283,11 @@ public class HubbleTransactionsCodeLab {
     }
 
     System.out.println("Beginning workload.");
-    int numProcessors = Runtime.getRuntime().availableProcessors() / 2;
-    ExecutorService writeExecutor = Executors.newFixedThreadPool(numProcessors);
-    ExecutorService readExecutor = Executors.newFixedThreadPool(numProcessors);
-
-    for (int i = 0; i < numProcessors; ++i) {
-      writeExecutor.submit(
-          new Runnable() {
-            @Override
-            public void run() {
-              updates(dbClient, keys, mutationsPerTransaction, numMinutes);
-            }
-          });
-
-      readExecutor.submit(
-          new Runnable() {
-            @Override
-            public void run() {
-              reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong);
-            }
-          });
-    }
-
-    writeExecutor.shutdown();
-    readExecutor.shutdown();
-    while (!writeExecutor.isTerminated()) {}
-    while (!readExecutor.isTerminated()) {}
+    executeTasksInParallel(
+        () -> updates(dbClient, keys, mutationsPerTransaction, numMinutes), NUM_PROCESSORS / 2);
+    executeTasksInParallel(
+        () -> reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong),
+        NUM_PROCESSORS / 2);
   }
 
   private void createDatabase(
@@ -347,7 +330,11 @@ public class HubbleTransactionsCodeLab {
                 .to("updated!")
                 .build());
       }
-      dbClient.write(mutations);
+      try {
+        dbClient.write(mutations);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -377,6 +364,32 @@ public class HubbleTransactionsCodeLab {
                 .read("Message", keySetBuilder.build(), Arrays.asList("body"));
         while (throwaway.next()) {}
       }
+    }
+  }
+
+  private void executeTasksInParallel(Runnable task, int numProcessors) {
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+    for (int i = 0; i < numProcessors; ++i) {
+      final int threadCount = i;
+      CompletableFuture<Void> future =
+          CompletableFuture.runAsync(task, executorService)
+              .exceptionally(
+                  ex -> {
+                    System.err.println(
+                        "Error in Thread ::" + threadCount + " Exception::" + ex.getMessage());
+                    return null;
+                  });
+      futures.add(future);
+    }
+    CompletableFuture<Void> allOf =
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+    try {
+      allOf.get(); // Wait for all threads to complete
+    } catch (InterruptedException | ExecutionException e) {
+      e.printStackTrace();
+    } finally {
+      executorService.shutdown();
     }
   }
 }
