@@ -20,8 +20,6 @@ public class HubbleTransactionsCodeLab {
   private static final String SUBJECT = "Random subject for the email for testing purpose %s";
 
   private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
-  private static final ExecutorService EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(NUM_PROCESSORS);
 
   public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
@@ -51,7 +49,6 @@ public class HubbleTransactionsCodeLab {
                 + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
                 + ") PRIMARY KEY (sid, msg_id),"
                 + "INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
-
   }
 
   public void createWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
@@ -127,9 +124,9 @@ public class HubbleTransactionsCodeLab {
   }
 
   public void doWorkSingleTransactionParallel(DatabaseClient dbClient, boolean doneValue) {
-
+    ExecutorService executorService = Executors.newFixedThreadPool(NUM_PROCESSORS);
     for (int i = 0; i < NUM_PROCESSORS; ++i) {
-      EXECUTOR_SERVICE.submit(
+      executorService.submit(
           new Runnable() {
             @Override
             public void run() {
@@ -137,18 +134,14 @@ public class HubbleTransactionsCodeLab {
             }
           });
     }
-    EXECUTOR_SERVICE.shutdown();
-    while (!EXECUTOR_SERVICE.isTerminated()) {}
+    executorService.shutdown();
+    while (!executorService.isTerminated()) {}
   }
 
   public void writeMailboxes(DatabaseClient dbClient, int numMailboxes) {
     List<Mutation> mutations = new ArrayList<>();
     for (int sid = 0; sid < numMailboxes; ++sid) {
-      mutations.add(
-          Mutation.newInsertBuilder("Mailbox")
-              .set("sid")
-              .to(sid)
-              .build());
+      mutations.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(sid).build());
     }
     try {
       dbClient.write(mutations);
@@ -191,7 +184,6 @@ public class HubbleTransactionsCodeLab {
       DatabaseClient dbClient, int numMailboxes, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
         () -> writeMessagesInterleaved(dbClient, numMailboxes, mutationsPerTransaction, numMinutes),
-        EXECUTOR_SERVICE,
         NUM_PROCESSORS);
   }
 
@@ -249,17 +241,13 @@ public class HubbleTransactionsCodeLab {
   public void writeMessagesParallel(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
-        () -> writeMessages(dbClient, mutationsPerTransaction, numMinutes),
-        EXECUTOR_SERVICE,
-        NUM_PROCESSORS);
+        () -> writeMessages(dbClient, mutationsPerTransaction, numMinutes), NUM_PROCESSORS);
   }
 
   public void writeMessagesParallelUUID(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
-        () -> writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes),
-        EXECUTOR_SERVICE,
-        NUM_PROCESSORS);
+        () -> writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes), NUM_PROCESSORS);
   }
 
   public void updatesAndReads(
@@ -295,17 +283,11 @@ public class HubbleTransactionsCodeLab {
     }
 
     System.out.println("Beginning workload.");
-    int numProcessorsTemp = NUM_PROCESSORS / 2;
-    ExecutorService writeExecutor = Executors.newFixedThreadPool(numProcessorsTemp);
-    ExecutorService readExecutor = Executors.newFixedThreadPool(numProcessorsTemp);
     executeTasksInParallel(
-        () -> updates(dbClient, keys, mutationsPerTransaction, numMinutes),
-        writeExecutor,
-        numProcessorsTemp);
+        () -> updates(dbClient, keys, mutationsPerTransaction, numMinutes), NUM_PROCESSORS / 2);
     executeTasksInParallel(
         () -> reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong),
-        readExecutor,
-        numProcessorsTemp);
+        NUM_PROCESSORS / 2);
   }
 
   private void createDatabase(
@@ -373,9 +355,7 @@ public class HubbleTransactionsCodeLab {
       }
       if (isStrong) {
         ResultSet throwaway =
-            dbClient
-                .singleUse()
-                .read("Message", keySetBuilder.build(), Arrays.asList("body"));
+            dbClient.singleUse().read("Message", keySetBuilder.build(), Arrays.asList("body"));
         while (throwaway.next()) {}
       } else {
         ResultSet throwaway =
@@ -387,9 +367,9 @@ public class HubbleTransactionsCodeLab {
     }
   }
 
-  private void executeTasksInParallel(
-      Runnable task, ExecutorService executorService, int numProcessors) {
+  private void executeTasksInParallel(Runnable task, int numProcessors) {
     List<CompletableFuture<Void>> futures = new ArrayList<>();
+    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
     for (int i = 0; i < numProcessors; ++i) {
       final int threadCount = i;
       CompletableFuture<Void> future =
