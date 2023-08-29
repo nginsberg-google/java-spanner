@@ -96,9 +96,6 @@ import org.threeten.bp.temporal.ChronoField;
 
 public class SpannerSample {
 
-    static String loremIpsum =
-	"Aenean sit amet lectus est. Nullam ornare ligula luctus auctor placerat. Morbi fermentum volutpat massa, sit amet consectetur metus vehicula sed. Sed auctor scelerisque tempus. Morbi hendrerit tortor et felis scelerisque, at fermentum risus posuere. Suspendisse finibus, tellus eu ullamcorper posuere, odio ex pulvinar est, a malesuada libero turpis quis massa. Quisque placerat lacus orci. Proin ac viverra metus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus cursus rhoncus iaculis. Pellentesque nisl tellus, venenatis nec erat sit amet, eleifend porttitor nisl. Maecenas fringilla ex id mauris facilisis, sed luctus dui elementum. Suspendisse ac orci lectus. Suspendisse vitae sapien convallis, commodo leo ut, ultricies arcu. Fusce pellentesque sem vestibulum, sodales purus eget, auctor odio. Ut et nunc metus. Aenean ac ex faucibus, tristique nibh ut, euismod lorem. Fusce a ex ut nibh consectetur mollis. Aenean suscipit elit dui, faucibus vestibulum leo commodo a. Nulla ultricies vitae velit cursus commodo. Morbi eu sapien in magna condimentum porta quis eget sem. Etiam tempor auctor diam, quis mollis odio scelerisque et. Fusce tempus mauris mi, et varius enim condimentum in. Aliquam nisi lorem, pulvinar id ullamcorper vitae, fringilla vel leo. Fusce vehicula tincidunt vulputate. Vivamus efficitur nunc quis lorem porttitor elementum. Donec ex neque, vestibulum nec mollis quis, lacinia quis dui. Nullam rhoncus quis lacus nec euismod. Vivamus porttitor sem nec nisl auctor ultrices. Vivamus non laoreet lectus. Aliquam condimentum semper libero eu elementum. Nullam lobortis ultricies gravida. Integer in lacinia lacus, ac consequat magna. Suspendisse et risus vel diam facilisis ornare a in arcu. Nulla nec nunc sem. Cras aliquam nulla sem, luctus maximus est gravida ut. Ut pellentesque pharetra convallis. Quisque molestie, ipsum sit amet scelerisque convallis, magna ante fringilla massa, in blandit turpis nibh ornare magna. Curabitur mi tortor, feugiat id sem ac, scelerisque congue tortor. Aenean non viverra risus. Praesent vel enim quis dolor auctor aliquet. Maecenas faucibus mi at venenatis suscipit. Integer interdum magna vitae mauris interdum, laoreet ullamcorper erat tincidunt. Morbi vel ipsum convallis, semper quam vitae, sagittis tellus. In facilisis eu lorem imperdiet laoreet. Suspendisse gravida a magna et condimentum. Suspendisse vitae risus vitae est pulvinar convallis at sit amet sem. Morbi vel imperdiet leo, sit amet cursus urna. Pellentesque suscipit ut neque non laoreet. Duis non ipsum ipsum. Quisque ut porttitor dui. Duis nulla augue, varius quis tellus sed, efficitur bibendum justo. Cras vestibulum congue ante in gravida. Quisque tincidunt nisi nisl, sed vulputate leo luctus ac. Pellentesque quis tempor leo, sed faucibus ipsum. Donec rutrum turpis nec auctor lobortis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Sed lobortis sodales risus vitae eleifend. Nullam pharetra dapibus lobortis. Vestibulum nisl diam, dignissim sit amet lacus sit amet, venenatis auctor nisi. Phasellus sollicitudin tortor a mi fringilla, imperdiet tristique ex feugiat. Nulla ut vehicula metus, nec tempus odio. Phasellus pellentesque lacus lacus, fringilla egestas felis hendrerit ac. Nam suscipit orci eros, at molestie nunc tincidunt id. Aliquam maximus finibus leo. Vestibulum orci turpis, fringilla eget lorem id, cursus consequat tortor. Suspendisse efficitur purus lectus, ac ornare sem lobortis a. Interdum et malesuada fames ac ante ipsum primis in faucibus. Sed sodales id mi eu aliquam. Curabitur enim libero, tempor vel vestibulum id, eleifend at lacus. Maecenas ut feugiat justo, nec dictum justo. Nulla porttitor accumsan rhoncus. Cras ligula velit, molestie sit amet molestie sed, commodo et libero. Etiam eu condimentum arcu. Aliquam erat volutpat. Nullam sit amet urna ipsum. Vestibulum at velit id velit tincidunt ultricies a ut metus. In vitae mollis diam. Proin lacinia fringilla purus vitae aliquet. Vestibulum a tincidunt eros. Aenean imperdiet aliquet arcu, vitae euismod turpis fermentum quis. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Suspendisse potenti. Pellentesque quis efficitur mauris, pulvinar sagittis ante. Cras efficitur porta convallis. Nullam eleifend congue finibus. Nam sodales tincidunt odio ac elementum. Sed sem risus, imperdiet quis suscipit eu, imperdiet vitae nibh. Morbi gravida neque ac sodales varius. In convallis massa vel lectus fermentum ultricies ac vitae eros. Sed justo sem, dignissim sit amet tempus ultrices, pellentesque at libero. Quisque a quam volutpat, tristique erat a, auctor enim. Suspendisse finibus arcu erat, nec mattis tortor facilisis in. Donec ornare mattis lorem, in interdum turpis venenatis vel. Mauris tempus porttitor libero. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vivamus eget tempor dui. Nunc et elit eu eros tincidunt sapien.";
-
   /** Class to contain singer sample data. */
   static class Singer {
 
@@ -396,82 +393,6 @@ public class SpannerSample {
   }
   // [END spanner_insert_data]
 
-    // Writes rows [startId, endId)
-    static void hubbleWriteRows(DatabaseClient dbClient,
-				int startId,
-				int endId) {
-	// This is sort of weird, guids aren't really this long. Maybe make this into messages?
-	char[] chars = new char[5000]; // 5KB
-	Arrays.fill(chars, 'a');
-	String ballast = new String(chars);
-	
-	List<Mutation> mutations = new ArrayList<>();
-	for (int sid = startId; sid < endId; ++sid) {
-	    mutations.add(Mutation.newInsertBuilder("Mailbox")
-			  .set("sid").to(sid)
-			  .set("guid").to(ballast)
-			  .build());
-	}
-	dbClient.write(mutations);
-	System.out.printf("Ids [%d, %d)\n", startId, endId);	
-    }
-
-    // Breaks if numRows is not evenly divisible by (rowsPerTransaction * numThreads)
-    static void hubbleDistripbutedWrites(DatabaseClient dbClient,
-					int numRows,
-					int rowsPerTransaction,
-					int numThreads) {
-	int numTransactions = numRows / rowsPerTransaction;
-	int numTransactionsPerThread = numTransactions / numThreads;
-	int numRowsPerThread = numRows / numThreads;
-
-	ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
-	
-	for (int i = 0; i < numTransactionsPerThread; ++i) {
-	    for (int j = 0; j < numThreads; ++j) {
-		int startId = (j * numRowsPerThread) + (i * rowsPerTransaction);
-		int endId = startId + rowsPerTransaction;
-		executorService.submit(new Runnable() {
-			@Override
-			public void run() {
-			    hubbleWriteRows(dbClient, startId, endId);
-			}
-		    });
-	    }
-	}
-	executorService.shutdown();
-	while (!executorService.isTerminated()) {}
-    }
-
-    // This is the same as above, except the inner and outer loops are switched.
-    static void hubbleIncreasingWrites(DatabaseClient dbClient,
-					int numRows,
-					int offset,
-					int rowsPerTransaction,
-					int numThreads) {
-	int numTransactions = numRows / rowsPerTransaction;
-	int numTransactionsPerThread = numTransactions / numThreads;
-	int numRowsPerThread = numRows / numThreads;
-
-	ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
-	
-	for (int i = 0; i < numThreads; ++i) {
-	    for (int j = 0; j < numTransactionsPerThread; ++j) {
-		int startId = (i * numRowsPerThread) + (j * rowsPerTransaction);
-		int endId = startId + rowsPerTransaction;
-		executorService.submit(new Runnable() {
-			@Override
-			public void run() {
-			    hubbleWriteRows(dbClient, startId + offset, endId + offset);
-			}
-		    });
-	    }
-	}
-	executorService.shutdown();
-	while (!executorService.isTerminated()) {}
-    }
-
-				       
   // [START spanner_delete_data]
   static void deleteExampleData(DatabaseClient dbClient) {
     List<Mutation> mutations = new ArrayList<>();
@@ -1988,28 +1909,6 @@ public class SpannerSample {
     }
   }
   // [END spanner_delete_backup]
-
-    static void hubbleCreateDatabase(DatabaseAdminClient dbAdminClient,
-				     DatabaseId id,
-				     List<String> schema) {
-	OperationFuture<Database, CreateDatabaseMetadata> op =
-	    dbAdminClient.createDatabase(
-	        id.getInstanceId().getInstance(),
-		id.getDatabase(),
-		schema);
-	try {
-	    // Initiate the request which returns an OperationFuture.
-	    Database db = op.get();
-	    System.out.println("Created database [" + db.getId() + "]");
-	} catch (ExecutionException e) {
-	    // If the operation failed during execution, expose the cause.
-	    throw (SpannerException) e.getCause();
-	} catch (InterruptedException e) {
-	    // Throw when a thread is waiting, sleeping, or otherwise occupied,
-	    // and the thread is interrupted, either before or during the activity.
-	    throw SpannerExceptionFactory.propagateInterrupt(e);
-	}
-    }
 
   static void run(
       DatabaseClient dbClient,
