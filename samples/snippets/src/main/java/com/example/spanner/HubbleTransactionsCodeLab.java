@@ -20,8 +20,6 @@ public class HubbleTransactionsCodeLab {
   private static final String SUBJECT = "Random subject for the email for testing purpose %s";
 
   private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
-  private static final ExecutorService EXECUTOR_SERVICE =
-      Executors.newFixedThreadPool(NUM_PROCESSORS);
 
   public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
@@ -51,7 +49,6 @@ public class HubbleTransactionsCodeLab {
                 + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
                 + ") PRIMARY KEY (sid, msg_id),"
                 + "INTERLEAVE IN PARENT Mailbox ON DELETE CASCADE"));
-
   }
 
   public void createWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
@@ -139,7 +136,6 @@ public class HubbleTransactionsCodeLab {
       DatabaseClient dbClient, int numMailboxes, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
         () -> writeMessagesInterleaved(dbClient, numMailboxes, mutationsPerTransaction, numMinutes),
-        EXECUTOR_SERVICE,
         NUM_PROCESSORS);
   }
 
@@ -197,17 +193,13 @@ public class HubbleTransactionsCodeLab {
   public void writeMessagesParallel(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
-        () -> writeMessages(dbClient, mutationsPerTransaction, numMinutes),
-        EXECUTOR_SERVICE,
-        NUM_PROCESSORS);
+        () -> writeMessages(dbClient, mutationsPerTransaction, numMinutes), NUM_PROCESSORS);
   }
 
   public void writeMessagesParallelUUID(
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
-        () -> writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes),
-        EXECUTOR_SERVICE,
-        NUM_PROCESSORS);
+        () -> writeMessagesUUID(dbClient, mutationsPerTransaction, numMinutes), NUM_PROCESSORS);
   }
 
   public void updatesAndReads(
@@ -243,17 +235,11 @@ public class HubbleTransactionsCodeLab {
     }
 
     System.out.println("Beginning workload.");
-    int numProcessorsTemp = NUM_PROCESSORS / 2;
-    ExecutorService writeExecutor = Executors.newFixedThreadPool(numProcessorsTemp);
-    ExecutorService readExecutor = Executors.newFixedThreadPool(numProcessorsTemp);
     executeTasksInParallel(
-        () -> updates(dbClient, keys, mutationsPerTransaction, numMinutes),
-        writeExecutor,
-        numProcessorsTemp);
+        () -> updates(dbClient, keys, mutationsPerTransaction, numMinutes), NUM_PROCESSORS / 2);
     executeTasksInParallel(
         () -> reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong),
-        readExecutor,
-        numProcessorsTemp);
+        NUM_PROCESSORS / 2);
   }
 
   public void doWorkSingleTransactionParallelLocking(DatabaseClient dbClient) {
@@ -396,7 +382,6 @@ public class HubbleTransactionsCodeLab {
     executeTasksInParallel(
         () ->
             hubbleWriteMessagesInterleaved100K(dbClient, numMailboxes, mutationsPerTransactionTemp),
-        EXECUTOR_SERVICE,
         NUM_PROCESSORS);
   }
 
@@ -505,9 +490,9 @@ public class HubbleTransactionsCodeLab {
     }
   }
 
-  private void executeTasksInParallel(
-      Runnable task, ExecutorService executorService, int numProcessors) {
+  private void executeTasksInParallel(Runnable task, int numProcessors) {
     List<CompletableFuture<Void>> futures = new ArrayList<>();
+    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
     for (int i = 0; i < numProcessors; ++i) {
       final int threadCount = i;
       CompletableFuture<Void> future =
