@@ -244,8 +244,7 @@ public class HubbleTransactionsCodeLab {
 
   public void doWorkSingleTransactionParallelLocking(DatabaseClient dbClient) {
     // getting the available processor
-    int numProcessors = Runtime.getRuntime().availableProcessors();
-    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+    ExecutorService executorService = Executors.newFixedThreadPool(NUM_PROCESSORS);
 
     List<Future<Integer>> futures = new ArrayList<>();
     // List to store the count of total number of workItem(row) which has not yet completed means
@@ -273,7 +272,7 @@ public class HubbleTransactionsCodeLab {
     }
 
     // Assigning each thread the amount of work equally
-    for (int i = 0; i < numProcessors; ++i) {
+    for (int i = 0; i < NUM_PROCESSORS; ++i) {
       // Each thread get the index from this loop, total workItem to be processed and number of
       // thread (numProcessors) available for processing.
       // E.g In case of 10 threads and 30 workItem the assignment for this method would be like
@@ -289,7 +288,7 @@ public class HubbleTransactionsCodeLab {
           "SELECT * FROM WorkList WHERE is_done is false and generated_value= '%s';";
       Callable<Integer> callable =
           new WorkItemProcessor<>(
-              workItemCount, i, numProcessors, dbClient, lockQueryInTransaction);
+              workItemCount, i, NUM_PROCESSORS, dbClient, lockQueryInTransaction);
       // Submitting each thread
       Future<Integer> future = executorService.submit(callable);
       futures.add(future);
@@ -312,8 +311,7 @@ public class HubbleTransactionsCodeLab {
 
   public void doWorkSingleTransactionParallelNonLocking(DatabaseClient dbClient) {
     // getting the available processor
-    int numProcessors = Runtime.getRuntime().availableProcessors();
-    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+    ExecutorService executorService = Executors.newFixedThreadPool(NUM_PROCESSORS);
 
     List<Future<Integer>> futures = new ArrayList<>();
     // This is the store the count of total number of workItem(row) which has not yet completed
@@ -337,7 +335,7 @@ public class HubbleTransactionsCodeLab {
     }
 
     // Assigning each thread the amount of work equally
-    for (int i = 0; i < numProcessors; ++i) {
+    for (int i = 0; i < NUM_PROCESSORS; ++i) {
       // Each thread get the index from this loop, total workItem to be processed and number of
       // thread (numProcessors) available for processing.
       // E.g In case of 10 threads and 30 workItem the assignment for this method would be like
@@ -353,7 +351,7 @@ public class HubbleTransactionsCodeLab {
           "SELECT * FROM WorkList WHERE is_done is false and id= '%s';";
       Callable<Integer> callable =
           new WorkItemProcessor<>(
-              workItemCount, i, numProcessors, dbClient, nonLockQueryInTransaction);
+              workItemCount, i, NUM_PROCESSORS, dbClient, nonLockQueryInTransaction);
       // Submitting each thread
       Future<Integer> future = executorService.submit(callable);
       futures.add(future);
