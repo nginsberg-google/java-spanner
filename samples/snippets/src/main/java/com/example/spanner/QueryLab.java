@@ -2,7 +2,6 @@ package com.example.spanner;
 
 import com.google.cloud.spanner.*;
 import com.google.common.collect.ImmutableList;
-
 import java.util.*;
 
 /**
@@ -96,7 +95,6 @@ public class QueryLab {
       dbClient.write(mutationsPerson);
       dbClient.write(mutationsContact);
       dbClient.write(mutationsAddress);
-
     }
   }
 
@@ -169,17 +167,8 @@ public class QueryLab {
   /** Helper method to generate the random phone number. */
   private String generateRandomPhoneNumber() {
     Random random = new Random();
-
-    // Generating area code (3 digits)
-    int areaCode = random.nextInt(999); // Random area code between 200 and 999
-
-    // Generating exchange code (3 digits)
-    int exchangeCode = random.nextInt(999); // Random exchange code between 100 and 999
-
-    // Generating subscriber number (4 digits)
-    int subscriberNumber = random.nextInt(9999); // Random subscriber number between 1000 and 9999
-
-    return String.format("(%03d) %03d-%04d", areaCode, exchangeCode, subscriberNumber);
+    return String.format(
+        "(%03d) %03d-%04d", random.nextInt(999), random.nextInt(999), random.nextInt(9999));
   }
 
   /** Helper method to generate the random us states. */
@@ -236,9 +225,6 @@ public class QueryLab {
       "Wisconsin",
       "Wyoming"
     };
-
-    Random random = new Random();
-    int randomIndex = random.nextInt(usStates.length);
-    return usStates[randomIndex];
+    return usStates[new Random().nextInt(usStates.length)];
   }
 }
