@@ -196,12 +196,8 @@ public class HubbleTransactionsCodeLab {
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
                 .to(Instant.now().toString() + i)
-                .set("SUBJECT")
-                .to(String.format(SUBJECT, i))
                 .set("body")
                 .to(LOREM_IPSUM)
-                .set("send_timestamp")
-                .to(Value.COMMIT_TIMESTAMP)
                 .build());
       }
       try {
@@ -222,12 +218,8 @@ public class HubbleTransactionsCodeLab {
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
                 .to(Instant.now().toString() + i)
-                .set("SUBJECT")
-                .to(String.format(SUBJECT, i))
                 .set("body")
                 .to(LOREM_IPSUM)
-                .set("send_timestamp")
-                .to(Value.COMMIT_TIMESTAMP)
                 .build());
       }
       try {
