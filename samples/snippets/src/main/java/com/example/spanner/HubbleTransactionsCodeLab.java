@@ -106,8 +106,7 @@ public class HubbleTransactionsCodeLab {
                 transaction -> {
                   List<String> idList = new ArrayList<>();
                   // Executing the above query to get 100 row where is_done is false, it will result
-                  // a
-                  // full table scan
+                  // a full table scan
                   ResultSet resultSet = transaction.executeQuery(Statement.of(stmt));
                   // fetching the id value of each row to save in the list.
                   while (resultSet.next()) {
@@ -140,7 +139,7 @@ public class HubbleTransactionsCodeLab {
   }
 
   /*
-  This method helps reproduce the non Locking scenario, its the correct way using read and write in Spanner. This method
+  This method helps reproduce the non Locking scenario, it's the correct way using read and write in Spanner. This method
   will be executed from multiple thread but here we are executing the limit query in separate read transaction(as it does the full table scan)
   and updating the rows value in separate readWriteTransaction. We are also performing a select to validate the row value but that select is on
   primary key column, so it does not do the full table scan and avoids get table level lock. It's running the user query
