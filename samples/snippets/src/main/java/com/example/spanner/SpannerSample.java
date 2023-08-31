@@ -1957,10 +1957,10 @@ public class SpannerSample {
           hubbleTransactionsCodeLab.writeWorkItems(dbClient, 1000, 50);
 	break;
       case "transactionLabDoWorkSingleTransactionSerialParallelLocking":
-          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, true,true);
+          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, true);
 	break;
       case "transactionLabDoWorkSingleTransactionSerialParallelNonLocking":
-          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, true,false);
+          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
     break;
       case "write":
         writeExampleData(dbClient);

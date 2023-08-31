@@ -87,35 +87,51 @@ public class HubbleTransactionsCodeLab {
     }
   }
 
-  private boolean doWorkSingleTransactionLocking(DatabaseClient dbClient, boolean doneValue) {
+  /*
+  This method helps reproduce the Lock scenario in Spanner. This method will be executed from multiple thread
+  and due to the nature of readWriteTransaction this kind of work can not be expedited because of parallelism.
+  It's running the user query  which is using a limit 100 but eventually will lock the whole table due to the full table scan.
+  We are also writing the rows value in the table in same transaction so only one thread at a time gets the lock to write
+  will succeed.
+   */
+  private boolean doWorkSingleTransactionLocking(DatabaseClient dbClient) {
 
-    String stmt = String.format("SELECT * FROM WorkList WHERE is_done is %b LIMIT 100", !doneValue);
+    String stmt = "SELECT * FROM WorkList WHERE is_done is false LIMIT 100";
 
     return Boolean.TRUE.equals(
         dbClient
+            // In this logic read and write is happening in same transaction.
             .readWriteTransaction()
             .run(
                 transaction -> {
-                  Random random = new Random();
                   List<String> idList = new ArrayList<>();
+                  // Executing the above query to get 100 row where is_done is false, it will result
+                  // a
+                  // full table scan
                   ResultSet resultSet = transaction.executeQuery(Statement.of(stmt));
-
+                  // fetching the id value of each row to save in the list.
                   while (resultSet.next()) {
                     idList.add(resultSet.getString("id"));
                   }
                   resultSet.close();
+                  // return false if there are no rows.
                   if (idList.size() == 0) return false;
 
-                  int randIdx = random.nextInt(idList.size());
+                  // finding a random number between 1 and the size of list and using that
+                  // to get the id at that position from the list. This is just a way to select a
+                  // random id out of 100 to process. As it will be executed in multithreading
+                  // environment each thread may get different rows as much as possible.
+                  // One thread at a time will just update a single row.
+                  int randIdx = new Random().nextInt(idList.size());
                   String id = idList.get(randIdx);
                   System.out.printf("Doing work: %s\n", id);
-
+                  // updating the rows is_done value to true in the same transaction.
                   transaction.buffer(
                       Mutation.newUpdateBuilder("WorkList")
                           .set("id")
                           .to(id)
                           .set("is_done")
-                          .to(doneValue)
+                          .to(true)
                           .set("timestamp")
                           .to(Value.COMMIT_TIMESTAMP)
                           .build());
@@ -123,43 +139,64 @@ public class HubbleTransactionsCodeLab {
                 }));
   }
 
-  private boolean doWorkSingleTransactionNonLocking(DatabaseClient dbClient, boolean doneValue) {
+  /*
+  This method helps reproduce the non Locking scenario, its the correct way using read and write in Spanner. This method
+  will be executed from multiple thread but here we are executing the limit query in separate read transaction(as it does the full table scan)
+  and updating the rows value in separate readWriteTransaction. We are also performing a select to validate the row value but that select is on
+  primary key column, so it does not do the full table scan and avoids get table level lock. It's running the user query
+  which is using a limit 100 in separate read transaction.
+   */
+  private boolean doWorkSingleTransactionNonLocking(DatabaseClient dbClient) {
 
-    String stmt = String.format("SELECT * FROM WorkList WHERE is_done is %b LIMIT 100", !doneValue);
+    String stmt = "SELECT * FROM WorkList WHERE is_done is false LIMIT 100";
     List<String> idList = new ArrayList<>();
-
+    // Reading the the data in seperate read only transaction.
     try (ReadOnlyTransaction transaction = dbClient.readOnlyTransaction()) {
       ResultSet queryResultSet = transaction.executeQuery(Statement.of(stmt));
+      // fetching the id value of each row to save in the list.
       while (queryResultSet.next()) {
         idList.add(queryResultSet.getString("id"));
       }
       queryResultSet.close();
     }
+
+    // return false if there are no rows.
     if (idList.size() == 0) return false;
+
+    // Finding a random number between 1 and the size of list and using that
+    // to get the id at that position from the list. This is just a way to select a
+    // random id out of 100 to process. As it will be executed in multithreading
+    // environment each thread may get different rows as much as possible.
+    int randIdx = new Random().nextInt(idList.size());
+    String id = idList.get(randIdx);
 
     return Boolean.TRUE.equals(
         dbClient
+            // starting a read write transaction
             .readWriteTransaction()
             .run(
                 transaction -> {
-                  Random random = new Random();
-                  int randIdx = random.nextInt(idList.size());
-                  String id = idList.get(randIdx);
+                  // Reading a specific row based on the primary key column Id from the table, but
+                  // this will not lock the table as it's not the full table scan.
                   Struct idRow =
                       transaction.readRow(
                           "WorkList",
                           Key.of(id), // Read single row in a table.
                           Arrays.asList("id", "is_done", "timestamp"));
 
-                  if (idRow == null || idRow.getBoolean("is_done")) return false;
+                  if (idRow == null) {
+                    throw new RuntimeException("Table 'Worklist' is empty");
+                  }
 
+                  if (idRow.getBoolean("is_done")) return false;
+                  // Updating the is_done value to true for the same row.
                   System.out.printf("Doing work: %s\n", id);
                   transaction.buffer(
                       Mutation.newUpdateBuilder("WorkList")
                           .set("id")
                           .to(idRow.getValue("id"))
                           .set("is_done")
-                          .to(doneValue)
+                          .to(true)
                           .set("timestamp")
                           .to(Value.COMMIT_TIMESTAMP)
                           .build());
@@ -167,22 +204,19 @@ public class HubbleTransactionsCodeLab {
                 }));
   }
 
-  private void doWorkSingleTransactionSerial(
-      DatabaseClient dbClient, boolean doneValue, boolean isLocking) {
+  private void doWorkSingleTransactionSerial(DatabaseClient dbClient, boolean isLocking) {
     boolean workRemaining = true;
-    int workDone = 0;
     while (workRemaining) {
       workRemaining =
           isLocking
-              ? doWorkSingleTransactionLocking(dbClient, doneValue)
-              : doWorkSingleTransactionNonLocking(dbClient, doneValue);
+              ? doWorkSingleTransactionLocking(dbClient)
+              : doWorkSingleTransactionNonLocking(dbClient);
     }
   }
 
-  public void doWorkSingleTransactionParallel(
-      DatabaseClient dbClient, boolean doneValue, boolean isLocking) {
+  public void doWorkSingleTransactionParallel(DatabaseClient dbClient, boolean isLocking) {
     executeTasksInParallel(
-        () -> doWorkSingleTransactionSerial(dbClient, doneValue, isLocking), NUM_PROCESSORS);
+        () -> doWorkSingleTransactionSerial(dbClient, isLocking), NUM_PROCESSORS);
   }
 
   public void writeMailboxes(DatabaseClient dbClient, int numMailboxes) {
