@@ -59,7 +59,6 @@ public class HubbleTransactionsCodeLab {
             "CREATE TABLE WorkList("
                 + " id STRING(MAX) NOT NULL,"
                 + " is_done BOOL,"
-                + " generated_value STRING(MAX) NOT NULL,"
                 + " timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true), "
                 + ") PRIMARY KEY (id)"));
   }
@@ -76,8 +75,6 @@ public class HubbleTransactionsCodeLab {
                 .to(UUID.randomUUID().toString())
                 .set("is_done")
                 .to(false)
-                .set("generated_value")
-                .to(UUID.randomUUID().toString())
                 .set("timestamp")
                 .to(Value.COMMIT_TIMESTAMP)
                 .build());
