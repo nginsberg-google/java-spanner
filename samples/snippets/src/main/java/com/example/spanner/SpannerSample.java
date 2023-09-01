@@ -1922,6 +1922,7 @@ public class SpannerSample {
       BackupId backup) {
       HubbleTransactionsCodeLab hubbleTransactionsCodeLab=new HubbleTransactionsCodeLab();
       QueryLab queryLab=new QueryLab();
+      ObservabilityLab observabilityLab = new ObservabilityLab();
     switch (command) {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
@@ -1982,6 +1983,39 @@ public class SpannerSample {
     break;
       case "queryLabInsertTestDataToJoinTables":
         queryLab.insertTestDataToJoinTables(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_ROWS*100);
+    break;
+      case "observabilityLabCreateMessageForIncreasingWrites":
+        observabilityLab.createMessages(dbAdminClient,database);
+    break;
+      case "observabilityLabPerformMonotonicallyIncreasingWrite":
+        observabilityLab.performMonotonicallyIncreasingWritesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, 1);
+    break;
+      case "observabilityLabCreateMessageForMultiParticipantWrite":
+        observabilityLab.createMessages(dbAdminClient, database);
+    break;
+      case "observabilityLabPerformMultiParticipantWrite":
+        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
+    break;
+      case "observabilityLabCreateInterleaved":
+        observabilityLab.createInterleaved(dbAdminClient, database);
+    break;
+      case "observabilityLabWriteMailboxes":
+        observabilityLab.writeMailboxes(dbClient, NUM_MAILBOXES);
+    break;
+      case "observabilityWriteMessagesInterleavedParallel":
+        observabilityLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
+    break;
+      case "observabilityLabCreateWorkItems":
+        observabilityLab.createWorkItems(dbAdminClient, database);
+    break;
+      case "observabilityLabWriteWorkItems":
+        observabilityLab.writeWorkItems(dbClient, NUM_ROWS, MUTATIONS_PER_TRANSACTION*10);
+    break;
+      case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelLocking":
+        observabilityLab.doWorkSingleTransactionParallel(dbClient, true);
+    break;
+      case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelNonLocking":
+        observabilityLab.doWorkSingleTransactionParallel(dbClient, false);
     break;
       case "write":
         writeExampleData(dbClient);
