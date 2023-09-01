@@ -12,6 +12,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * This class helps in the execution of observability lab(lab3), it basically shows the usage of
+ * request tags, transaction tags, hotspot etc. Method written and execute for the duration to
+ * simulate these behaviour.
+ */
 public class ObservabilityLab {
 
   private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
@@ -224,11 +229,7 @@ public class ObservabilityLab {
   public void writeMailboxes(DatabaseClient dbClient, int numMailboxes) {
     List<Mutation> mutations = new ArrayList<>();
     for (int sid = 0; sid < numMailboxes; ++sid) {
-      mutations.add(
-          Mutation.newInsertBuilder("Mailbox")
-              .set("sid")
-              .to(sid)
-              .build());
+      mutations.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(sid).build());
     }
     try {
       dbClient.writeWithOptions(
