@@ -94,6 +94,8 @@ import org.threeten.bp.temporal.ChronoField;
 
 public class SpannerSample {
 
+  private static final int MUTATIONS_PER_TRANSACTION = 50;
+
   /** Class to contain singer sample data. */
   static class Singer {
 
@@ -1928,13 +1930,13 @@ public class SpannerSample {
           hubbleTransactionsCodeLab.writeMessages(dbClient, 1, 5);
 	break;
       case "transactionLabWriteMessages50":
-          hubbleTransactionsCodeLab.writeMessages(dbClient, 50, 5);
+          hubbleTransactionsCodeLab.writeMessages(dbClient, MUTATIONS_PER_TRANSACTION, 5);
 	break;
       case "transactionLabWriteMessagesParallel":
-          hubbleTransactionsCodeLab.writeMessagesParallel(dbClient, 50, 5);
+          hubbleTransactionsCodeLab.writeMessagesParallel(dbClient, MUTATIONS_PER_TRANSACTION, 5);
 	break;
       case "transactionLabWriteMessagesParallelUUID":
-          hubbleTransactionsCodeLab.writeMessagesParallelUUID(dbClient, 50, 5);
+          hubbleTransactionsCodeLab.writeMessagesParallelUUID(dbClient, MUTATIONS_PER_TRANSACTION, 5);
 	break;
       case "transactionLabCreateInterleaved":
           hubbleTransactionsCodeLab.createInterleaved(dbAdminClient, database);
@@ -1943,7 +1945,7 @@ public class SpannerSample {
           hubbleTransactionsCodeLab.writeMailboxes(dbClient, 40);
 	break;
       case "transactionLabWriteMessagesInterleavedParallel":
-          hubbleTransactionsCodeLab.writeMessagesInterleavedParallel(dbClient, 40, 50, 5);
+          hubbleTransactionsCodeLab.writeMessagesInterleavedParallel(dbClient, 40, MUTATIONS_PER_TRANSACTION, 5);
 	break;
       case "transactionLabUpdatesAndStrongReads":
           hubbleTransactionsCodeLab.updatesAndReads(dbClient, 40, 5, 1000, 5, true);
@@ -1955,7 +1957,7 @@ public class SpannerSample {
           hubbleTransactionsCodeLab.createWorkItems(dbAdminClient, database);
 	break;
       case "transactionLabWriteWorkItems":
-          hubbleTransactionsCodeLab.writeWorkItems(dbClient, 1000, 50);
+          hubbleTransactionsCodeLab.writeWorkItems(dbClient, 1000, MUTATIONS_PER_TRANSACTION);
 	break;
       case "transactionLabDoWorkSingleTransactionSerialParallelLocking":
           hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, true);
@@ -1967,7 +1969,7 @@ public class SpannerSample {
         queryLab.createJoinTables(dbAdminClient, database);
     break;
       case "queryLabInsertTestDataToJoinTables":
-        queryLab.insertTestDataToJoinTables(dbClient, 50, 100000);
+        queryLab.insertTestDataToJoinTables(dbClient, MUTATIONS_PER_TRANSACTION, /*Rows to be inserted*/ 100000);
     break;
       case "write":
         writeExampleData(dbClient);
