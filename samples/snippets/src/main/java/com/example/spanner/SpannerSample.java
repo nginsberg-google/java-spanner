@@ -1967,6 +1967,15 @@ public class SpannerSample {
 	break;
       case "transactionLabDoWorkSingleTransactionSerialParallelNonLocking":
           hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
+    break;
+      case "queryLabCreateInterleaved":
+          queryLab.createInterleaved(dbAdminClient, database);
+    break;
+      case "queryLabWriteMailboxes":
+          queryLab.writeMailboxes(dbClient, NUM_MAILBOXES);
+    break;
+      case "queryLabWriteMessagesInterleavedParallel":
+          queryLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
 	break;
       case "queryLabCreateJoinTables":
         queryLab.createJoinTables(dbAdminClient, database);
