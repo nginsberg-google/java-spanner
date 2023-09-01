@@ -206,6 +206,32 @@ public class ObservabilityLab {
   }
 
   /**
+   * This method create the Message and Mailbox table. These tables follow parent child relationship
+   * but not interleaved.
+   *
+   * @param dbAdminClient DatabaseAdminClient
+   * @param id Database object
+   */
+  public void createNonInterleaved(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+    createDatabase(
+        dbAdminClient,
+        id,
+        Arrays.asList(
+            "CREATE TABLE Mailbox("
+                + "sid STRING(MAX) NOT NULL,"
+                + "state STRING(MAX),"
+                + ") PRIMARY KEY (sid)",
+            "CREATE TABLE Message("
+                + " sid STRING(MAX) NOT NULL,"
+                + " msg_id STRING(MAX) NOT NULL,"
+                + " subject STRING(MAX),"
+                + " body STRING(MAX),"
+                + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
+                + " CONSTRAINT FKMailboxMessage FOREIGN KEY (sid) REFERENCES Mailbox(sid)"
+                + ") PRIMARY KEY (msg_id)"));
+  }
+
+  /**
    * Below method inserts the data in the table using random UUID value of primary. This method is
    * expected to generate a mutli participant write in the table. Initial few minutes are required
    * for warm up after which spanner may split the tablet into to or more. Here body is kept smaller
@@ -219,18 +245,30 @@ public class ObservabilityLab {
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
     while (Instant.now().isBefore(doneTime)) {
-      List<Mutation> mutations = new ArrayList<>();
+      List<Mutation> mutationsMessage = new ArrayList<>();
+      List<Mutation> mutationsMailbox = new ArrayList<>();
       for (int i = 0; i < mutationsPerTransaction; ++i) {
-        mutations.add(
+        String sid = UUID.randomUUID().toString();
+        mutationsMailbox.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(sid).build());
+        mutationsMessage.add(
             Mutation.newInsertBuilder("Message")
+                .set("sid")
+                .to(sid)
                 .set("msg_id")
                 .to(UUID.randomUUID().toString())
+                .set("subject")
+                .to(String.format("test-subject-%d", i))
                 .set("body")
-                .to(String.format("test-body-%s", i))
+                .to(String.format("test-body-%d", i))
+                .set("send_timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
                 .build());
       }
+      // Writing all the rows in different tables.
       dbClient.writeWithOptions(
-          mutations, Options.tag("app=lab3,env=dev,case=multi-part,action=insert"));
+          mutationsMailbox, Options.tag("app=lab3,env=dev,case=multi-part-mail,action=insert"));
+      dbClient.writeWithOptions(
+          mutationsMessage, Options.tag("app=lab3,env=dev,case=multi-part-msg,action=insert"));
     }
   }
 
