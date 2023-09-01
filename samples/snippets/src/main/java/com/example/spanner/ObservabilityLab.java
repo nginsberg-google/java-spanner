@@ -219,9 +219,9 @@ public class ObservabilityLab {
       DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
     while (Instant.now().isBefore(doneTime)) {
-      List<Mutation> mutationsMessage = new ArrayList<>();
+      List<Mutation> mutations = new ArrayList<>();
       for (int i = 0; i < mutationsPerTransaction; ++i) {
-        mutationsMessage.add(
+        mutations.add(
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
                 .to(UUID.randomUUID().toString())
@@ -230,7 +230,7 @@ public class ObservabilityLab {
                 .build());
       }
       dbClient.writeWithOptions(
-          mutationsMessage, Options.tag("app=lab3,env=dev,case=multi-part,action=insert"));
+          mutations, Options.tag("app=lab3,env=dev,case=multi-part,action=insert"));
     }
   }
 
