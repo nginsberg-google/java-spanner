@@ -94,6 +94,11 @@ import org.threeten.bp.temporal.ChronoField;
 
 public class SpannerSample {
 
+  private static final int MUTATIONS_PER_TRANSACTION = 5;
+  private static final int NUM_MAILBOXES = 40;
+  private static final int NUM_ROWS = 1000;
+  private static final int NUM_MINUTES = 5;
+
   /** Class to contain singer sample data. */
   static class Singer {
 
@@ -1916,6 +1921,7 @@ public class SpannerSample {
       DatabaseId database,
       BackupId backup) {
       HubbleTransactionsCodeLab hubbleTransactionsCodeLab=new HubbleTransactionsCodeLab();
+      QueryLab queryLab=new QueryLab();
     switch (command) {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
@@ -1924,43 +1930,49 @@ public class SpannerSample {
           hubbleTransactionsCodeLab.createMessages(dbAdminClient, database);
 	break;
       case "transactionLabWriteMessages1":
-          hubbleTransactionsCodeLab.writeMessages(dbClient, 1, 5);
+          hubbleTransactionsCodeLab.writeMessages(dbClient, 1, NUM_MINUTES);
 	break;
       case "transactionLabWriteMessages50":
-          hubbleTransactionsCodeLab.writeMessages(dbClient, 50, 5);
+          hubbleTransactionsCodeLab.writeMessages(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES);
 	break;
       case "transactionLabWriteMessagesParallel":
-          hubbleTransactionsCodeLab.writeMessagesParallel(dbClient, 50, 5);
+          hubbleTransactionsCodeLab.writeMessagesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES);
 	break;
       case "transactionLabWriteMessagesParallelUUID":
-          hubbleTransactionsCodeLab.writeMessagesParallelUUID(dbClient, 50, 5);
+          hubbleTransactionsCodeLab.writeMessagesParallelUUID(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES);
 	break;
       case "transactionLabCreateInterleaved":
           hubbleTransactionsCodeLab.createInterleaved(dbAdminClient, database);
 	break;
       case "transactionLabWriteMailboxes":
-          hubbleTransactionsCodeLab.writeMailboxes(dbClient, 40);
+          hubbleTransactionsCodeLab.writeMailboxes(dbClient, NUM_MAILBOXES);
 	break;
       case "transactionLabWriteMessagesInterleavedParallel":
-          hubbleTransactionsCodeLab.writeMessagesInterleavedParallel(dbClient, 40, 50, 5);
+          hubbleTransactionsCodeLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES);
 	break;
       case "transactionLabUpdatesAndStrongReads":
-          hubbleTransactionsCodeLab.updatesAndReads(dbClient, 40, 5, 1000, 5, true);
+          hubbleTransactionsCodeLab.updatesAndReads(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION, NUM_ROWS, NUM_MINUTES, true);
 	break;
       case "transactionLabUpdatesAndWeakReads":
-          hubbleTransactionsCodeLab.updatesAndReads(dbClient, 40, 5, 1000, 5, false);
+          hubbleTransactionsCodeLab.updatesAndReads(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION, NUM_ROWS, NUM_MINUTES, false);
 	break;
       case "transactionLabCreateWorkItems":
           hubbleTransactionsCodeLab.createWorkItems(dbAdminClient, database);
 	break;
       case "transactionLabWriteWorkItems":
-          hubbleTransactionsCodeLab.writeWorkItems(dbClient, 1000, 50);
+          hubbleTransactionsCodeLab.writeWorkItems(dbClient, NUM_ROWS, MUTATIONS_PER_TRANSACTION*10);
 	break;
       case "transactionLabDoWorkSingleTransactionSerialParallelLocking":
           hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, true);
 	break;
       case "transactionLabDoWorkSingleTransactionSerialParallelNonLocking":
           hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
+	break;
+      case "queryLabCreateJoinTables":
+        queryLab.createJoinTables(dbAdminClient, database);
+    break;
+      case "queryLabInsertTestDataToJoinTables":
+        queryLab.insertTestDataToJoinTables(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_ROWS*100);
     break;
       case "write":
         writeExampleData(dbClient);
