@@ -26,7 +26,7 @@ public class ObservabilityLab {
    * @param dbAdminClient DatabaseAdminClient
    * @param id Database object
    */
-  public void createMessageForIncreasingWrites(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+  public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
         dbAdminClient,
         id,
