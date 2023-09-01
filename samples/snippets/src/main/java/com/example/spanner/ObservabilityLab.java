@@ -6,10 +6,7 @@ import com.google.spanner.admin.database.v1.CreateDatabaseMetadata;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -28,72 +25,42 @@ public class ObservabilityLab {
   private AtomicInteger sharedValue = new AtomicInteger();
 
   public void createMessageForIncreasingKey(DatabaseAdminClient dbAdminClient, DatabaseId id) {
-    //    createDatabase(
-    //            dbAdminClient,
-    //            id,
-    //            Arrays.asList(
-    //                    "CREATE TABLE Message("
-    //                            + " msg_id Int64 NOT NULL,"
-    //                            + " subject STRING(MAX),"
-    //                            + " body STRING(MAX),"
-    //                            + " send_timestamp TIMESTAMP  OPTIONS
-    // (allow_commit_timestamp=true)"
-    //                            + ") PRIMARY KEY (msg_id)"));
     createDatabase(
-        dbAdminClient,
-        id,
-        Arrays.asList(
-            "CREATE TABLE Mailbox("
-                + "sid INT64 NOT NULL,"
-                + "state STRING(MAX),"
-                + ") PRIMARY KEY (sid)",
-            "CREATE TABLE Message("
-                + " sid INT64 NOT NULL,"
-                + " msg_id INT64 NOT NULL,"
-                + " subject STRING(MAX),"
-                + " body STRING(MAX),"
-                + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
-                + " CONSTRAINT FKMailboxMessage FOREIGN KEY (sid) REFERENCES Mailbox(sid)"
-                + ") PRIMARY KEY (msg_id)"));
+            dbAdminClient,
+            id,
+            Arrays.asList(
+                    "CREATE TABLE Message("
+                            + " msg_id STRING(MAX) NOT NULL,"
+                            + " body STRING(MAX),"
+                            + ") PRIMARY KEY (msg_id)"));
   }
 
-  public void performMonotonicallyIncreasingWrite(
-      DatabaseClient dbClient, int mutationsPerTransaction, int totalRows) {
-
-    int rowCount = 0;
-    while (rowCount < totalRows) {
-      List<Mutation> mutationsMessage = new ArrayList<>();
-      List<Mutation> mutationsMailbox = new ArrayList<>();
+  public void performMonotonicallyIncreasingWrite(DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
+    Instant doneTime = Instant.now().plus(numMinutes, ChronoUnit.MINUTES);
+    while (Instant.now().isBefore(doneTime)) {
+      List<Mutation> mutations = new ArrayList<>();
       for (int i = 0; i < mutationsPerTransaction; ++i) {
-        int tempRowCount = sharedValue.getAndIncrement();
-        mutationsMailbox.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(tempRowCount).build());
-        mutationsMessage.add(
+        mutations.add(
             Mutation.newInsertBuilder("Message")
-                .set("sid")
-                .to(tempRowCount)
                 .set("msg_id")
-                .to(tempRowCount)
-                .set("subject")
-                .to(String.format("test-subject-%d", i))
+                .to(Instant.now().toString() + i + Thread.currentThread().getId())
                 .set("body")
-                .to(String.format("test-body-%d",i))
-                .set("send_timestamp")
-                .to(Value.COMMIT_TIMESTAMP)
+                .to(LOREM_IPSUM)
                 .build());
-        rowCount++;
       }
-      // Writing all the rows in different tables.
-      dbClient.writeWithOptions(
-          mutationsMailbox, Options.tag("app=observabilityLabMailbox1,env=dev,action=insert"));
-      dbClient.writeWithOptions(
-          mutationsMessage, Options.tag("app=labIncreasingIdMessage1,env=dev,action=insert"));
+      try {
+        dbClient.writeWithOptions(
+                mutations, Options.tag("app=observabilitylab,env=dev,case=mono-increasing-message,action=insert"));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
   public void performMonotonicallyIncreasingWriteParallel(
-      DatabaseClient dbClient, int mutationsPerTransaction, int totalRows) {
+      DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
     executeTasksInParallel(
-        () -> performMonotonicallyIncreasingWrite(dbClient, mutationsPerTransaction, totalRows),
+        () -> performMonotonicallyIncreasingWrite(dbClient, mutationsPerTransaction, numMinutes),
         NUM_PROCESSORS);
   }
 
@@ -148,12 +115,177 @@ public class ObservabilityLab {
                 .build());
         rowCount++;
       }
-      // Writing all the rows in different tables.
       dbClient.writeWithOptions(
-          mutationsMailbox, Options.tag("app=observabilityLabMailbox,env=dev,action=insert"));
+          mutationsMailbox, Options.tag("app=observabilitylab,env=dev,case=multiparticipant-mailbox,action=insert"));
       dbClient.writeWithOptions(
-          mutationsMessage, Options.tag("app=observabilityLabMessage,env=dev,action=insert"));
+          mutationsMessage, Options.tag("app=observabilitylab,env=dev,case=multiparticipant-message,action=insert"));
     }
+  }
+
+  public void createWorkItems(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+    createDatabase(
+            dbAdminClient,
+            id,
+            Arrays.asList(
+                    "CREATE TABLE WorkList("
+                            + " id STRING(MAX) NOT NULL,"
+                            + " is_done BOOL,"
+                            + " timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true), "
+                            + ") PRIMARY KEY (id)"));
+  }
+
+  public void writeWorkItems(
+          DatabaseClient dbClient, int numWorkItems, int mutationsPerTransaction) {
+    int numTransactions = numWorkItems / mutationsPerTransaction;
+    for (int i = 0; i < numTransactions; ++i) {
+      List<Mutation> mutations = new ArrayList<>();
+      for (int j = 0; j < mutationsPerTransaction; ++j) {
+        mutations.add(
+                Mutation.newInsertBuilder("WorkList")
+                        .set("id")
+                        .to(UUID.randomUUID().toString())
+                        .set("is_done")
+                        .to(false)
+                        .set("timestamp")
+                        .to(Value.COMMIT_TIMESTAMP)
+                        .build());
+      }
+      try {
+        dbClient.writeWithOptions(mutations,Options.tag("app=observabilitylab,env=dev,case=writeWorkItems,action=insert"));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  private void doWorkSingleTransactionSerial(DatabaseClient dbClient, boolean isLocking) {
+    boolean workRemaining = true;
+    while (workRemaining) {
+      workRemaining =
+              isLocking
+                      ? doWorkSingleTransactionLocking(dbClient)
+                      : doWorkSingleTransactionNonLocking(dbClient);
+    }
+  }
+
+  public void doWorkSingleTransactionParallel(DatabaseClient dbClient, boolean isLocking) {
+    executeTasksInParallel(
+            () -> doWorkSingleTransactionSerial(dbClient, isLocking), NUM_PROCESSORS);
+  }
+
+  /*
+ This method helps reproduce the Lock scenario in Spanner. This method will be executed from multiple thread
+ and due to the nature of readWriteTransaction this kind of work can not be expedited because of parallelism.
+ It's running the user query  which is using a limit 100 but eventually will lock the whole table due to the full table scan.
+ We are also writing the rows value in the table in same transaction so only one thread at a time gets the lock to write
+ will succeed.
+  */
+  private boolean doWorkSingleTransactionLocking(DatabaseClient dbClient) {
+
+    String stmt = "SELECT * FROM WorkList WHERE is_done is false LIMIT 100";
+    return Boolean.TRUE.equals(
+            dbClient
+                    // In this logic read and write is happening in same transaction.
+                    .readWriteTransaction(Options.tag("app=observalibitylab,env=dev,case=locking"))
+                    .run(
+                            transaction -> {
+                              List<String> idList = new ArrayList<>();
+                              // Executing the above query to get 100 row where is_done is false, it will result
+                              // a full table scan
+                              ResultSet resultSet = transaction.executeQuery(Statement.of(stmt),Options.tag("app=observalibitylab,env=dev,case=locking,action=select"));
+                              // fetching the id value of each row to save in the list.
+                              while (resultSet.next()) {
+                                idList.add(resultSet.getString("id"));
+                              }
+                              resultSet.close();
+                              // return false if there are no rows.
+                              if (idList.size() == 0) return false;
+
+                              // finding a random number between 1 and the size of list and using that
+                              // to get the id at that position from the list. This is just a way to select a
+                              // random id out of 100 to process. As it will be executed in multithreading
+                              // environment each thread may get different rows as much as possible.
+                              // One thread at a time will just update a single row.
+                              int randIdx = new Random().nextInt(idList.size());
+                              String id = idList.get(randIdx);
+                              System.out.printf("Doing work: %s\n", id);
+                              // updating the rows is_done value to true in the same transaction.
+                              transaction.buffer(
+                                      Mutation.newUpdateBuilder("WorkList")
+                                              .set("id")
+                                              .to(id)
+                                              .set("is_done")
+                                              .to(true)
+                                              .set("timestamp")
+                                              .to(Value.COMMIT_TIMESTAMP)
+                                              .build());
+                              return true;
+                            }));
+  }
+
+  /*
+  This method helps reproduce the non Locking scenario, it's the correct way using read and write in Spanner. This method
+  will be executed from multiple thread but here we are executing the limit query in separate read transaction(as it does the full table scan)
+  and updating the rows value in separate readWriteTransaction. We are also performing a select to validate the row value but that select is on
+  primary key column, so it does not do the full table scan and avoids get table level lock. It's running the user query
+  which is using a limit 100 in separate read transaction.
+   */
+  private boolean doWorkSingleTransactionNonLocking(DatabaseClient dbClient) {
+
+    String stmt = "SELECT * FROM WorkList WHERE is_done is false LIMIT 100";
+    List<String> idList = new ArrayList<>();
+    // Reading the the data in seperate read only transaction.
+    try (ReadOnlyTransaction transaction = dbClient.readOnlyTransaction()) {
+      ResultSet queryResultSet = transaction.executeQuery(Statement.of(stmt),Options.tag("app=observalibitylab,env=dev,case=nonlocking,action=select"));
+      // fetching the id value of each row to save in the list.
+      while (queryResultSet.next()) {
+        idList.add(queryResultSet.getString("id"));
+      }
+      queryResultSet.close();
+    }
+
+    // return false if there are no rows.
+    if (idList.size() == 0) return false;
+
+    // Finding a random number between 1 and the size of list and using that
+    // to get the id at that position from the list. This is just a way to select a
+    // random id out of 100 to process. As it will be executed in multithreading
+    // environment each thread may get different rows as much as possible.
+    int randIdx = new Random().nextInt(idList.size());
+    String id = idList.get(randIdx);
+
+    return Boolean.TRUE.equals(
+            dbClient
+                    // starting a read write transaction
+                    .readWriteTransaction(Options.tag("app=observalibitylab,env=dev,case=non-locking"))
+                    .run(
+                            transaction -> {
+                              // Reading a specific row based on the primary key column Id from the table, but
+                              // this will not lock the table as it's not the full table scan.
+                              Struct idRow =
+                                      transaction.readRow(
+                                              "WorkList",
+                                              Key.of(id), // Read single row in a table.
+                                              Arrays.asList("id", "is_done", "timestamp"));
+
+                              if (idRow == null) {
+                                throw new RuntimeException("Table 'Worklist' is empty");
+                              }
+
+                              if (idRow.getBoolean("is_done")) return false;
+                              // Updating the is_done value to true for the same row.
+                              System.out.printf("Doing work: %s\n", id);
+                              transaction.buffer(
+                                      Mutation.newUpdateBuilder("WorkList")
+                                              .set("id")
+                                              .to(idRow.getValue("id"))
+                                              .set("is_done")
+                                              .to(true)
+                                              .set("timestamp")
+                                              .to(Value.COMMIT_TIMESTAMP)
+                                              .build());
+                              return true;
+                            }));
   }
 
   public void writeMessages(DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
@@ -196,14 +328,6 @@ public class ObservabilityLab {
     }
   }
 
-  //  public void readMessage(DatabaseClient dbClient) {
-  //    ResultSet set = dbClient.singleUse().executeQuery(Statement.of("select * from Message limit
-  // 10"),Options.tag("app=observabilitylab,env=dev,action=select"));
-  //    while (set.next()){
-  ////      System.out.println( set.getString("msg_id"));
-  //    }
-  //  }
-
   private void createDatabase(
       DatabaseAdminClient dbAdminClient, DatabaseId id, List<String> schema) {
     OperationFuture<Database, CreateDatabaseMetadata> op =
@@ -240,7 +364,7 @@ public class ObservabilityLab {
     CompletableFuture<Void> allOf =
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
     try {
-      allOf.get(); // Wait for all threads to complete
+      allOf.get();
     } catch (InterruptedException | ExecutionException e) {
       e.printStackTrace();
     } finally {

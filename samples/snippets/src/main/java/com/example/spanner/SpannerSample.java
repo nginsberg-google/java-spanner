@@ -1916,6 +1916,8 @@ public class SpannerSample {
       DatabaseId database,
       BackupId backup) {
       HubbleTransactionsCodeLab hubbleTransactionsCodeLab=new HubbleTransactionsCodeLab();
+
+     ObservabilityLab observabilityLab=new ObservabilityLab();
     switch (command) {
       case "createdatabase":
         createDatabase(dbAdminClient, database);
@@ -1959,25 +1961,36 @@ public class SpannerSample {
       case "transactionLabDoWorkSingleTransactionSerialParallelLocking":
           hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, true);
     break;
+      case "transactionLabDoWorkSingleTransactionSerialParallelNonLocking":
+          hubbleTransactionsCodeLab.doWorkSingleTransactionParallel(dbClient, false);
+    break;
       case "createMailboxAndMessageTables":
-        ObservabilityLab observabilityLab=new ObservabilityLab();
         observabilityLab.createMailboxAndMessageTables(dbAdminClient, database);
     break;
       case "performMultiParticipantWrite":
         long startTime=System.currentTimeMillis();
-        ObservabilityLab observabilityLab1=new ObservabilityLab();
-        observabilityLab1.performMultiParticipantWriteParallel(dbClient,50,240000);
+        observabilityLab.performMultiParticipantWriteParallel(dbClient,50,240000);
         System.out.println("Total time:"+(System.currentTimeMillis()-startTime));
         break;
       case "createMessageForMonotonicallyWritesTables":
-        ObservabilityLab observabilityLab2=new ObservabilityLab();
-        observabilityLab2.createMessageForIncreasingKey(dbAdminClient,database);
+        observabilityLab.createMessageForIncreasingKey(dbAdminClient,database);
         break;
       case "performMonotonicallyIncreasingWrite":
         long startTime1=System.currentTimeMillis();
-        ObservabilityLab observabilityLab3=new ObservabilityLab();
-        observabilityLab3.performMonotonicallyIncreasingWriteParallel(dbClient,50,200000);
+        observabilityLab.performMonotonicallyIncreasingWriteParallel(dbClient,50,8);
         System.out.println("Total time:"+(System.currentTimeMillis()-startTime1));
+        break;
+      case "observabilityLabCreateWorkItems":
+        observabilityLab.createWorkItems(dbAdminClient, database);
+        break;
+      case "observabilityLabWriteWorkItems":
+        observabilityLab.writeWorkItems(dbClient, 1000, 50);
+        break;
+      case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelLocking":
+        observabilityLab.doWorkSingleTransactionParallel(dbClient, true);
+        break;
+      case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelNonLocking":
+        observabilityLab.doWorkSingleTransactionParallel(dbClient, false);
         break;
       case "write":
         writeExampleData(dbClient);
