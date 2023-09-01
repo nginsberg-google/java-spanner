@@ -275,7 +275,7 @@ public class HubbleTransactionsCodeLab {
         mutations.add(
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
-                .to(Instant.now().toString() + i)
+                .to(Instant.now().toString() + i + Thread.currentThread().getId())
                 .set("body")
                 .to(LOREM_IPSUM)
                 .build());
@@ -297,7 +297,7 @@ public class HubbleTransactionsCodeLab {
         mutations.add(
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
-                .to(Instant.now().toString() + i)
+                .to(UUID.randomUUID().toString())
                 .set("body")
                 .to(LOREM_IPSUM)
                 .build());
