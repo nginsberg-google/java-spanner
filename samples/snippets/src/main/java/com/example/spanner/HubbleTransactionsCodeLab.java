@@ -355,11 +355,20 @@ public class HubbleTransactionsCodeLab {
     }
 
     System.out.println("Beginning workload.");
-    executeTasksInParallel(
-        () -> updates(dbClient, keys, mutationsPerTransaction, numMinutes), NUM_PROCESSORS / 2);
-    executeTasksInParallel(
-        () -> reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong),
-        NUM_PROCESSORS / 2);
+    ExecutorService writeExecutor = Executors.newFixedThreadPool(NUM_PROCESSORS / 2);
+    ExecutorService readExecutor = Executors.newFixedThreadPool(NUM_PROCESSORS / 2);
+
+    for (int i = 0; i < NUM_PROCESSORS / 2; ++i) {
+      writeExecutor.submit(() -> updates(dbClient, keys, mutationsPerTransaction, numMinutes));
+
+      readExecutor.submit(
+          () -> reads(dbClient, keys, mutationsPerTransaction, numMinutes, isStrong));
+    }
+
+    writeExecutor.shutdown();
+    readExecutor.shutdown();
+    while (!writeExecutor.isTerminated()) {}
+    while (!readExecutor.isTerminated()) {}
   }
 
   private void createDatabase(
