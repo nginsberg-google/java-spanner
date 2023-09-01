@@ -1972,10 +1972,10 @@ public class SpannerSample {
           queryLab.createInterleaved(dbAdminClient, database);
     break;
       case "queryLabWriteMailboxes":
-          queryLab.writeMailboxes(dbClient, 40);
+          queryLab.writeMailboxes(dbClient, NUM_MAILBOXES);
     break;
       case "queryLabWriteMessagesInterleavedParallel":
-          queryLab.writeMessagesInterleavedParallel(dbClient, 40, MUTATIONS_PER_TRANSACTION, 7);
+          queryLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
 	break;
       case "queryLabCreateJoinTables":
         queryLab.createJoinTables(dbAdminClient, database);
