@@ -9,7 +9,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ObservabilityLab {
 
@@ -18,17 +23,137 @@ public class ObservabilityLab {
 
   private static final String SUBJECT = "Random subject for the email for testing purpose %s";
 
-  public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+  private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
+
+  private AtomicInteger sharedValue = new AtomicInteger();
+
+  public void createMessageForIncreasingKey(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+    //    createDatabase(
+    //            dbAdminClient,
+    //            id,
+    //            Arrays.asList(
+    //                    "CREATE TABLE Message("
+    //                            + " msg_id Int64 NOT NULL,"
+    //                            + " subject STRING(MAX),"
+    //                            + " body STRING(MAX),"
+    //                            + " send_timestamp TIMESTAMP  OPTIONS
+    // (allow_commit_timestamp=true)"
+    //                            + ") PRIMARY KEY (msg_id)"));
     createDatabase(
         dbAdminClient,
         id,
         Arrays.asList(
+            "CREATE TABLE Mailbox("
+                + "sid INT64 NOT NULL,"
+                + "state STRING(MAX),"
+                + ") PRIMARY KEY (sid)",
             "CREATE TABLE Message("
-                + " msg_id STRING(MAX) NOT NULL,"
-                + " body STRING(MAX),"
+                + " sid INT64 NOT NULL,"
+                + " msg_id INT64 NOT NULL,"
                 + " subject STRING(MAX),"
+                + " body STRING(MAX),"
                 + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
+                + " CONSTRAINT FKMailboxMessage FOREIGN KEY (sid) REFERENCES Mailbox(sid)"
                 + ") PRIMARY KEY (msg_id)"));
+  }
+
+  public void performMonotonicallyIncreasingWrite(
+      DatabaseClient dbClient, int mutationsPerTransaction, int totalRows) {
+
+    int rowCount = 0;
+    while (rowCount < totalRows) {
+      List<Mutation> mutationsMessage = new ArrayList<>();
+      List<Mutation> mutationsMailbox = new ArrayList<>();
+      for (int i = 0; i < mutationsPerTransaction; ++i) {
+        int tempRowCount = sharedValue.getAndIncrement();
+        mutationsMailbox.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(tempRowCount).build());
+        mutationsMessage.add(
+            Mutation.newInsertBuilder("Message")
+                .set("sid")
+                .to(tempRowCount)
+                .set("msg_id")
+                .to(tempRowCount)
+                .set("subject")
+                .to(String.format("test-subject-%d", i))
+                .set("body")
+                .to(String.format("test-body-%d",i))
+                .set("send_timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
+                .build());
+        rowCount++;
+      }
+      // Writing all the rows in different tables.
+      dbClient.writeWithOptions(
+          mutationsMailbox, Options.tag("app=observabilityLabMailbox1,env=dev,action=insert"));
+      dbClient.writeWithOptions(
+          mutationsMessage, Options.tag("app=labIncreasingIdMessage1,env=dev,action=insert"));
+    }
+  }
+
+  public void performMonotonicallyIncreasingWriteParallel(
+      DatabaseClient dbClient, int mutationsPerTransaction, int totalRows) {
+    executeTasksInParallel(
+        () -> performMonotonicallyIncreasingWrite(dbClient, mutationsPerTransaction, totalRows),
+        NUM_PROCESSORS);
+  }
+
+  public void createMailboxAndMessageTables(DatabaseAdminClient dbAdminClient, DatabaseId id) {
+    createDatabase(
+        dbAdminClient,
+        id,
+        Arrays.asList(
+            "CREATE TABLE Mailbox("
+                + "sid STRING(MAX) NOT NULL,"
+                + "state STRING(MAX),"
+                + ") PRIMARY KEY (sid)",
+            "CREATE TABLE Message("
+                + " sid STRING(MAX) NOT NULL,"
+                + " msg_id STRING(MAX) NOT NULL,"
+                + " subject STRING(MAX),"
+                + " body STRING(MAX),"
+                + " send_timestamp TIMESTAMP  OPTIONS (allow_commit_timestamp=true),"
+                + " CONSTRAINT FKMailboxMessage FOREIGN KEY (sid) REFERENCES Mailbox(sid)"
+                + ") PRIMARY KEY (msg_id)"));
+  }
+
+  public void performMultiParticipantWriteParallel(
+      DatabaseClient dbClient, int mutationsPerTransaction, int totalRows) {
+    executeTasksInParallel(
+        () -> performMultiParticipantWrite(dbClient, mutationsPerTransaction, totalRows),
+        NUM_PROCESSORS);
+  }
+
+  public void performMultiParticipantWrite(
+      DatabaseClient dbClient, int mutationsPerTransaction, int totalRows) {
+
+    int rowCount = 0;
+    while (rowCount < totalRows) {
+      List<Mutation> mutationsMailbox = new ArrayList<>();
+      List<Mutation> mutationsMessage = new ArrayList<>();
+      for (int i = 0; i < mutationsPerTransaction; ++i) {
+        String sid = UUID.randomUUID().toString();
+        mutationsMailbox.add(Mutation.newInsertBuilder("Mailbox").set("sid").to(sid).build());
+        mutationsMessage.add(
+            Mutation.newInsertBuilder("Message")
+                .set("sid")
+                .to(sid)
+                .set("msg_id")
+                .to(UUID.randomUUID().toString())
+                .set("subject")
+                .to(String.format("test-subject-%s", i))
+                .set("body")
+                .to(String.format("test body-%s", i))
+                .set("send_timestamp")
+                .to(Value.COMMIT_TIMESTAMP)
+                .build());
+        rowCount++;
+      }
+      // Writing all the rows in different tables.
+      dbClient.writeWithOptions(
+          mutationsMailbox, Options.tag("app=observabilityLabMailbox,env=dev,action=insert"));
+      dbClient.writeWithOptions(
+          mutationsMessage, Options.tag("app=observabilityLabMessage,env=dev,action=insert"));
+    }
   }
 
   public void writeMessages(DatabaseClient dbClient, int mutationsPerTransaction, int numMinutes) {
@@ -49,7 +174,8 @@ public class ObservabilityLab {
                 .build());
       }
       try {
-        dbClient.writeWithOptions(mutations,Options.tag("app=observabilitylab,env=dev,action=insert"));
+        dbClient.writeWithOptions(
+            mutations, Options.tag("app=observabilitylab,env=dev,action=insert"));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -57,18 +183,26 @@ public class ObservabilityLab {
   }
 
   public void readMessage(DatabaseClient dbClient) {
-   ResultSet set = dbClient.singleUse().read("Message",KeySet.all(),    Arrays.asList("msg_id", "SUBJECT", "body","send_timestamp"),Options.tag("app=observabilitylab,env=dev,action=select"));
-   while (set.next()){
+    ResultSet set =
+        dbClient
+            .singleUse()
+            .read(
+                "Message",
+                KeySet.all(),
+                Arrays.asList("msg_id", "SUBJECT", "body", "send_timestamp"),
+                Options.tag("app=observabilitylab,env=dev,action=select"));
+    while (set.next()) {
       System.out.println(set.getString("msg_id"));
-   }
+    }
   }
 
-//  public void readMessage(DatabaseClient dbClient) {
-//    ResultSet set = dbClient.singleUse().executeQuery(Statement.of("select * from Message limit 10"),Options.tag("app=observabilitylab,env=dev,action=select"));
-//    while (set.next()){
-////      System.out.println( set.getString("msg_id"));
-//    }
-//  }
+  //  public void readMessage(DatabaseClient dbClient) {
+  //    ResultSet set = dbClient.singleUse().executeQuery(Statement.of("select * from Message limit
+  // 10"),Options.tag("app=observabilitylab,env=dev,action=select"));
+  //    while (set.next()){
+  ////      System.out.println( set.getString("msg_id"));
+  //    }
+  //  }
 
   private void createDatabase(
       DatabaseAdminClient dbAdminClient, DatabaseId id, List<String> schema) {
@@ -85,6 +219,32 @@ public class ObservabilityLab {
       // Throw when a thread is waiting, sleeping, or otherwise occupied,
       // and the thread is interrupted, either before or during the activity.
       throw SpannerExceptionFactory.propagateInterrupt(e);
+    }
+  }
+
+  private void executeTasksInParallel(Runnable task, int numProcessors) {
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+    ExecutorService executorService = Executors.newFixedThreadPool(numProcessors);
+    for (int i = 0; i < numProcessors; ++i) {
+      final int threadCount = i;
+      CompletableFuture<Void> future =
+          CompletableFuture.runAsync(task, executorService)
+              .exceptionally(
+                  ex -> {
+                    System.err.println(
+                        "Error in Thread ::" + threadCount + " Exception::" + ex.getMessage());
+                    return null;
+                  });
+      futures.add(future);
+    }
+    CompletableFuture<Void> allOf =
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+    try {
+      allOf.get(); // Wait for all threads to complete
+    } catch (InterruptedException | ExecutionException e) {
+      e.printStackTrace();
+    } finally {
+      executorService.shutdown();
     }
   }
 }
