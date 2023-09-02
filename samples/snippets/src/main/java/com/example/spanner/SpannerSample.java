@@ -1988,13 +1988,13 @@ public class SpannerSample {
         observabilityLab.createMessages(dbAdminClient,database);
     break;
       case "observabilityLabPerformMonotonicallyIncreasingWrite":
-        observabilityLab.performMonotonicallyIncreasingWritesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, 1);
+        observabilityLab.performMonotonicallyIncreasingWritesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
     break;
       case "observabilityLabCreateMessageForMultiParticipantWrite":
         observabilityLab.createMessages(dbAdminClient, database);
     break;
       case "observabilityLabPerformMultiParticipantWrite":
-        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
+        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
     break;
       case "observabilityLabCreateInterleaved":
         observabilityLab.createInterleaved(dbAdminClient, database);
@@ -2003,13 +2003,13 @@ public class SpannerSample {
         observabilityLab.writeMailboxes(dbClient, NUM_MAILBOXES);
     break;
       case "observabilityWriteMessagesInterleavedParallel":
-        observabilityLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
+        observabilityLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
     break;
       case "observabilityLabCreateWorkItems":
         observabilityLab.createWorkItems(dbAdminClient, database);
     break;
       case "observabilityLabWriteWorkItems":
-        observabilityLab.writeWorkItems(dbClient, NUM_ROWS, MUTATIONS_PER_TRANSACTION*10);
+        observabilityLab.writeWorkItems(dbClient, NUM_ROWS*2, MUTATIONS_PER_TRANSACTION*10);
     break;
       case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelLocking":
         observabilityLab.doWorkSingleTransactionParallel(dbClient, true);
