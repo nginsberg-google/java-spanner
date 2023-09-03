@@ -339,6 +339,8 @@ public class ObservabilityLab {
         dbClient
             // In this logic read and write is happening in same transaction.
             // Setting the transaction tag for main transaction
+            // This tag will be added as transaction tag and will be shown in
+            // TXN_STATS. tables like TXN_STATS_TOP_MINUTE
             .readWriteTransaction(Options.tag("app=lab3,env=dev,case=locking-method"))
             .run(
                 transaction -> {
@@ -349,6 +351,8 @@ public class ObservabilityLab {
                       transaction.executeQuery(
                           Statement.of(stmt),
                           // Setting the transaction for specific action
+                          // This tag will be added as request tag and will be shown in
+                          // QUERY_STATS. tables like QUERY_STATS_TOP_MINUTE
                           Options.tag("app=lab3,env=dev,case=locking,action=select"));
                   // fetching the id value of each row to save in the list.
                   while (resultSet.next()) {
@@ -397,6 +401,8 @@ public class ObservabilityLab {
           transaction.executeQuery(
               Statement.of(stmt),
               // Setting the transaction for specific action
+              // This tag will be added as request tag and will be shown in
+              // QUERY_STATS. tables like QUERY_STATS_TOP_MINUTE
               Options.tag("app=lab3,env=dev,case=non-locking,action=read-select"));
       // fetching the id value of each row to save in the list.
       while (queryResultSet.next()) {
@@ -418,6 +424,8 @@ public class ObservabilityLab {
     return Boolean.TRUE.equals(
         dbClient
             // starting a read write transaction
+            // This tag will be added as transaction tag and will be shown in
+            // TXN_STATS. tables like TXN_STATS_TOP_MINUTE
             .readWriteTransaction(Options.tag("app=lab3,env=dev,case=non-locking-method"))
             .run(
                 transaction -> {
