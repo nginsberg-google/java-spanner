@@ -1987,6 +1987,9 @@ public class SpannerSample {
       case "observabilityLabCreateMessageForIncreasingWrites":
         observabilityLab.createMessages(dbAdminClient,database);
     break;
+        // All observability lab tests are required to run more than 10-12 min as Key Visualizer
+        // starts showing up data after 8-10 min, hence keeping time as 15 min for most of the
+        // tests.
       case "observabilityLabPerformMonotonicallyIncreasingWrite":
         observabilityLab.performMonotonicallyIncreasingWritesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
     break;
@@ -1994,7 +1997,9 @@ public class SpannerSample {
         observabilityLab.createMessages(dbAdminClient, database);
     break;
       case "observabilityLabPerformMultiParticipantWrite":
-        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
+        // Multi participant write start changing AVG_Participant from 1-2 after approx 12 min with
+        // 10 thread, hence keeping this NUM_MINUTES close to this number.
+        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION * 10, NUM_MINUTES * 3);
     break;
       case "observabilityLabCreateInterleaved":
         observabilityLab.createInterleaved(dbAdminClient, database);
