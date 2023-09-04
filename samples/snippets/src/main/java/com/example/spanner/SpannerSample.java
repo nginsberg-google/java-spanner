@@ -1987,14 +1987,19 @@ public class SpannerSample {
       case "observabilityLabCreateMessageForIncreasingWrites":
         observabilityLab.createMessages(dbAdminClient,database);
     break;
+        // All observability lab tests are required to run more than 10-12 min as Key Visualizer
+        // starts showing up data after 8-10 min, hence keeping time as 15 min for most of the
+        // tests.
       case "observabilityLabPerformMonotonicallyIncreasingWrite":
-        observabilityLab.performMonotonicallyIncreasingWritesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, 1);
+        observabilityLab.performMonotonicallyIncreasingWritesParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
     break;
       case "observabilityLabCreateMessageForMultiParticipantWrite":
         observabilityLab.createMessages(dbAdminClient, database);
     break;
       case "observabilityLabPerformMultiParticipantWrite":
-        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
+        // Multi participant write start changing AVG_Participant from 1-2 after approx 12 min with
+        // 10 thread, hence keeping this NUM_MINUTES close to this number.
+        observabilityLab.performMultiParticipantWriteParallel(dbClient, MUTATIONS_PER_TRANSACTION * 10, NUM_MINUTES * 3);
     break;
       case "observabilityLabCreateInterleaved":
         observabilityLab.createInterleaved(dbAdminClient, database);
@@ -2003,13 +2008,13 @@ public class SpannerSample {
         observabilityLab.writeMailboxes(dbClient, NUM_MAILBOXES);
     break;
       case "observabilityWriteMessagesInterleavedParallel":
-        observabilityLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*2);
+        observabilityLab.writeMessagesInterleavedParallel(dbClient, NUM_MAILBOXES, MUTATIONS_PER_TRANSACTION*10, NUM_MINUTES*3);
     break;
       case "observabilityLabCreateWorkItems":
         observabilityLab.createWorkItems(dbAdminClient, database);
     break;
       case "observabilityLabWriteWorkItems":
-        observabilityLab.writeWorkItems(dbClient, NUM_ROWS, MUTATIONS_PER_TRANSACTION*10);
+        observabilityLab.writeWorkItems(dbClient, NUM_ROWS*3, MUTATIONS_PER_TRANSACTION*10);
     break;
       case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelLocking":
         observabilityLab.doWorkSingleTransactionParallel(dbClient, true);
