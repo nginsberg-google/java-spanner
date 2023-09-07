@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * This class helps in the execution of observability lab(lab3), it basically shows the usage of
@@ -19,6 +20,7 @@ import java.util.concurrent.Executors;
  */
 public class ObservabilityLab {
   private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
+  private final AtomicInteger msdId = new AtomicInteger(1);
 
   /**
    * This method creates Message table which will be used for monotonically increasing writes.
@@ -189,7 +191,10 @@ public class ObservabilityLab {
         mutations.add(
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
-                .to(Instant.now().toString() + i + Thread.currentThread().getId())
+                // This will add the incremental value and be thread safe. While re-running need to
+                // make sure that we delete the Ids from Table  or create fresh database as this
+                // will always start from 1
+                .to(msdId.getAndIncrement())
                 .set("body")
                 .to(String.format("test-body-%s", i))
                 .build());
