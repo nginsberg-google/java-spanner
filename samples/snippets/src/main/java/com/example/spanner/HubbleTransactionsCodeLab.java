@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class contains all the method and helper method for performing the steps defined for Spanner
@@ -22,7 +22,7 @@ public class HubbleTransactionsCodeLab {
 
   private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
 
-  private final AtomicInteger msdId = new AtomicInteger(1);
+  private final AtomicLong msdId = new AtomicLong(1);
 
   public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
