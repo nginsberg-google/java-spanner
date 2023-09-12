@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class contains all the method and helper method for performing the steps defined for Spanner
@@ -21,8 +20,6 @@ public class HubbleTransactionsCodeLab {
   private static final String SUBJECT = "Random subject for the email for testing purpose %s";
 
   private static final int NUM_PROCESSORS = Runtime.getRuntime().availableProcessors();
-
-  private final AtomicLong msdId = new AtomicLong(1);
 
   public void createMessages(DatabaseAdminClient dbAdminClient, DatabaseId id) {
     createDatabase(
@@ -278,10 +275,7 @@ public class HubbleTransactionsCodeLab {
         mutations.add(
             Mutation.newInsertBuilder("Message")
                 .set("msg_id")
-                // This will add the incremental value and be thread safe. While re-running need to
-                // make sure that we delete the Ids from Table  or create fresh database as this
-                // will always start from 1
-                .to(msdId.getAndIncrement())
+                .to(Instant.now().toString() + i + Thread.currentThread().getId())
                 .set("body")
                 .to(LOREM_IPSUM)
                 .build());

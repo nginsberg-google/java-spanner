@@ -2014,7 +2014,7 @@ public class SpannerSample {
         observabilityLab.createWorkItems(dbAdminClient, database);
     break;
       case "observabilityLabWriteWorkItems":
-        observabilityLab.writeWorkItems(dbClient, NUM_ROWS, MUTATIONS_PER_TRANSACTION*10);
+        observabilityLab.writeWorkItems(dbClient, NUM_ROWS*3, MUTATIONS_PER_TRANSACTION*10);
     break;
       case "observabilityLabtransactionLabDoWorkSingleTransactionSerialParallelLocking":
         observabilityLab.doWorkSingleTransactionParallel(dbClient, true);
