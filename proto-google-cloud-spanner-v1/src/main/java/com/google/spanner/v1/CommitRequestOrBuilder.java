@@ -202,8 +202,8 @@ public interface CommitRequestOrBuilder
    *
    * <pre>
    * If `true`, then statistics related to the transaction will be included in
-   * the [CommitResponse][google.spanner.v1.CommitResponse.commit_stats]. Default value is
-   * `false`.
+   * the [CommitResponse][google.spanner.v1.CommitResponse.commit_stats].
+   * Default value is `false`.
    * </pre>
    *
    * <code>bool return_commit_stats = 5;</code>
@@ -211,6 +211,50 @@ public interface CommitRequestOrBuilder
    * @return The returnCommitStats.
    */
   boolean getReturnCommitStats();
+
+  /**
+   *
+   *
+   * <pre>
+   * The amount of latency this request is willing to incur in order to improve
+   * throughput. If this field is not set, Spanner assumes requests are
+   * relatively latency sensitive and automatically determines an appropriate
+   * delay time. You can specify a batching delay value between 0 and 500 ms.
+   * </pre>
+   *
+   * <code>.google.protobuf.Duration max_commit_delay = 8;</code>
+   *
+   * @return Whether the maxCommitDelay field is set.
+   */
+  boolean hasMaxCommitDelay();
+  /**
+   *
+   *
+   * <pre>
+   * The amount of latency this request is willing to incur in order to improve
+   * throughput. If this field is not set, Spanner assumes requests are
+   * relatively latency sensitive and automatically determines an appropriate
+   * delay time. You can specify a batching delay value between 0 and 500 ms.
+   * </pre>
+   *
+   * <code>.google.protobuf.Duration max_commit_delay = 8;</code>
+   *
+   * @return The maxCommitDelay.
+   */
+  com.google.protobuf.Duration getMaxCommitDelay();
+  /**
+   *
+   *
+   * <pre>
+   * The amount of latency this request is willing to incur in order to improve
+   * throughput. If this field is not set, Spanner assumes requests are
+   * relatively latency sensitive and automatically determines an appropriate
+   * delay time. You can specify a batching delay value between 0 and 500 ms.
+   * </pre>
+   *
+   * <code>.google.protobuf.Duration max_commit_delay = 8;</code>
+   */
+  com.google.protobuf.DurationOrBuilder getMaxCommitDelayOrBuilder();
 
   /**
    *
