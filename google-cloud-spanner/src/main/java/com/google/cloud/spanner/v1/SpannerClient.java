@@ -942,6 +942,7 @@ public class SpannerClient implements BackgroundResource {
    *           .setSeqno(109325920)
    *           .setQueryOptions(ExecuteSqlRequest.QueryOptions.newBuilder().build())
    *           .setRequestOptions(RequestOptions.newBuilder().build())
+   *           .setDirectedReadOptions(DirectedReadOptions.newBuilder().build())
    *           .setDataBoostEnabled(true)
    *           .build();
    *   ResultSet response = spannerClient.executeSql(request);
@@ -990,6 +991,7 @@ public class SpannerClient implements BackgroundResource {
    *           .setSeqno(109325920)
    *           .setQueryOptions(ExecuteSqlRequest.QueryOptions.newBuilder().build())
    *           .setRequestOptions(RequestOptions.newBuilder().build())
+   *           .setDirectedReadOptions(DirectedReadOptions.newBuilder().build())
    *           .setDataBoostEnabled(true)
    *           .build();
    *   ApiFuture<ResultSet> future = spannerClient.executeSqlCallable().futureCall(request);
@@ -1031,6 +1033,7 @@ public class SpannerClient implements BackgroundResource {
    *           .setSeqno(109325920)
    *           .setQueryOptions(ExecuteSqlRequest.QueryOptions.newBuilder().build())
    *           .setRequestOptions(RequestOptions.newBuilder().build())
+   *           .setDirectedReadOptions(DirectedReadOptions.newBuilder().build())
    *           .setDataBoostEnabled(true)
    *           .build();
    *   ServerStream<PartialResultSet> stream =
@@ -1167,6 +1170,7 @@ public class SpannerClient implements BackgroundResource {
    *           .setResumeToken(ByteString.EMPTY)
    *           .setPartitionToken(ByteString.EMPTY)
    *           .setRequestOptions(RequestOptions.newBuilder().build())
+   *           .setDirectedReadOptions(DirectedReadOptions.newBuilder().build())
    *           .setDataBoostEnabled(true)
    *           .build();
    *   ResultSet response = spannerClient.read(request);
@@ -1216,6 +1220,7 @@ public class SpannerClient implements BackgroundResource {
    *           .setResumeToken(ByteString.EMPTY)
    *           .setPartitionToken(ByteString.EMPTY)
    *           .setRequestOptions(RequestOptions.newBuilder().build())
+   *           .setDirectedReadOptions(DirectedReadOptions.newBuilder().build())
    *           .setDataBoostEnabled(true)
    *           .build();
    *   ApiFuture<ResultSet> future = spannerClient.readCallable().futureCall(request);
@@ -1257,6 +1262,7 @@ public class SpannerClient implements BackgroundResource {
    *           .setResumeToken(ByteString.EMPTY)
    *           .setPartitionToken(ByteString.EMPTY)
    *           .setRequestOptions(RequestOptions.newBuilder().build())
+   *           .setDirectedReadOptions(DirectedReadOptions.newBuilder().build())
    *           .setDataBoostEnabled(true)
    *           .build();
    *   ServerStream<PartialResultSet> stream = spannerClient.streamingReadCallable().call(request);
@@ -1637,6 +1643,7 @@ public class SpannerClient implements BackgroundResource {
    *               SessionName.of("[PROJECT]", "[INSTANCE]", "[DATABASE]", "[SESSION]").toString())
    *           .addAllMutations(new ArrayList<Mutation>())
    *           .setReturnCommitStats(true)
+   *           .setMaxCommitDelay(Duration.newBuilder().build())
    *           .setRequestOptions(RequestOptions.newBuilder().build())
    *           .build();
    *   CommitResponse response = spannerClient.commit(request);
@@ -1680,6 +1687,7 @@ public class SpannerClient implements BackgroundResource {
    *               SessionName.of("[PROJECT]", "[INSTANCE]", "[DATABASE]", "[SESSION]").toString())
    *           .addAllMutations(new ArrayList<Mutation>())
    *           .setReturnCommitStats(true)
+   *           .setMaxCommitDelay(Duration.newBuilder().build())
    *           .setRequestOptions(RequestOptions.newBuilder().build())
    *           .build();
    *   ApiFuture<CommitResponse> future = spannerClient.commitCallable().futureCall(request);
