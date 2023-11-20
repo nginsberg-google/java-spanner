@@ -95,6 +95,11 @@ public final class Options implements Serializable {
     return COMMIT_STATS_OPTION;
   }
 
+  /** Specifies the maximum delay for the commit transaction. */
+  public static TransactionOption maxCommitDelayMs(int maxCommitDelayMs) {
+    return new MaxCommitDelayMsOption(maxCommitDelayMs);
+  }
+
   /**
    * Specifying this instructs the transaction to request Optimistic Lock from the backend. In this
    * concurrency mode, operations during the execution phase, i.e., reads and queries, are performed
@@ -234,6 +239,19 @@ public final class Options implements Serializable {
 
   static final CommitStatsOption COMMIT_STATS_OPTION = new CommitStatsOption();
 
+  static final class MaxCommitDelayMsOption extends InternalOption implements TransactionOption {
+    final int maxCommitDelayMs;
+
+    MaxCommitDelayMsOption(int maxCommitDelayMs) {
+      this.maxCommitDelayMs = maxCommitDelayMs;
+    }
+
+    @Override
+    void appendToOptions(Options options) {
+      options.maxCommitDelayMs = maxCommitDelayMs;
+    }
+  }
+
   /** Option to request Optimistic Concurrency Control for read/write transactions. */
   static final class OptimisticLockOption extends InternalOption implements TransactionOption {
     @Override
@@ -326,6 +344,7 @@ public final class Options implements Serializable {
   }
 
   private boolean withCommitStats;
+  private Integer maxCommitDelayMs;
   private Long limit;
   private Integer prefetchChunks;
   private Integer bufferRows;
@@ -344,6 +363,14 @@ public final class Options implements Serializable {
 
   boolean withCommitStats() {
     return withCommitStats;
+  }
+
+  boolean hasMaxCommitDelayMs() {
+    return maxCommitDelayMs != null;
+  }
+
+  int maxCommitDelayMs() {
+    return maxCommitDelayMs;
   }
 
   boolean hasLimit() {
@@ -444,6 +471,9 @@ public final class Options implements Serializable {
     if (withCommitStats) {
       b.append("withCommitStats: ").append(withCommitStats).append(' ');
     }
+    if (maxCommitDelayMs != null) {
+	b.append("maxCommitDelayMs: ").append(maxCommitDelayMs).append(' ');
+    }
     if (limit != null) {
       b.append("limit: ").append(limit).append(' ');
     }
@@ -493,6 +523,7 @@ public final class Options implements Serializable {
 
     Options that = (Options) o;
     return Objects.equals(withCommitStats, that.withCommitStats)
+	&& Objects.equals(maxCommitDelayMs, that.maxCommitDelayMs)
         && (!hasLimit() && !that.hasLimit()
             || hasLimit() && that.hasLimit() && Objects.equals(limit(), that.limit()))
         && (!hasPrefetchChunks() && !that.hasPrefetchChunks()
@@ -520,6 +551,9 @@ public final class Options implements Serializable {
     int result = 31;
     if (withCommitStats) {
       result = 31 * result + 1231;
+    }
+    if (maxCommitDelayMs != null) {
+      result = 31 * result + maxCommitDelayMs.hashCode();
     }
     if (limit != null) {
       result = 31 * result + limit.hashCode();
